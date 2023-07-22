@@ -42,6 +42,18 @@
 //! fmt.only(vec![Format::Plain]).print(&"test");
 //! ```
 //!
+//! Polyfmt is meant to be used as a formatter that is easy to be changed by the user.
+//! So most likely you'll want to automatically figure out which formatter you want from
+//! a flag of env_var the user passes in.
+//!
+//! ```rust
+//! # use polyfmt::{new, Format, Options};
+//! let some_flag = "plain".to_string(); // case-insensitive
+//! let format = Format::from_str(&some_flag).unwrap();
+//!
+//! let mut fmt = new(format, options).unwrap();
+//! ```
+//!
 //! ### Additional Details
 //!
 //! You can turn off color by using the popular `NO_COLOR` environment variable.
@@ -53,8 +65,10 @@ mod silent;
 
 use std::error::Error;
 use std::fmt::Debug;
+use strum::EnumString;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, EnumString, Clone, PartialEq, Eq)]
+#[strum(ascii_case_insensitive)]
 pub enum Format {
     /// Outputs text in a humanized fashion without spinners.
     Plain,
@@ -175,14 +189,17 @@ fn is_allowed(current_format: Format, allowed_formats: &Vec<Format>) -> bool {
 mod tests {
 
     use super::*;
-    use std::{thread, time};
+    use std::{str::FromStr, thread, time};
 
     #[test]
     fn it_works() {
         let options = Options { debug: true };
         let ten_millis = time::Duration::from_secs(2);
 
-        let mut fmt = new(Format::Json, options).unwrap();
+        let some_flag = "plain".to_string();
+        let format = Format::from_str(&some_flag).unwrap();
+
+        let mut fmt = new(format, options).unwrap();
         fmt.print(&"Demoing!");
         fmt.println(&"Hello from polyfmt");
 

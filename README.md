@@ -44,6 +44,17 @@ the following print command will only print for those formatters.
 fmt.only(vec![Format::Plain]).print(&"test");
 ```
 
+Polyfmt is meant to be used as a formatter that is easy to be changed by the user.
+So most likely you'll want to automatically figure out which formatter you want from
+a flag of env_var the user passes in.
+
+```rust
+let some_flag = "plain".to_string(); // case-insensitive
+let format = Format::from_str(&some_flag).unwrap();
+
+let mut fmt = new(format, options).unwrap();
+```
+
 ### Additional Details
 
 You can turn off color by using the popular `NO_COLOR` environment variable.
