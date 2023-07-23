@@ -48,10 +48,11 @@
 //!
 //! ```rust
 //! # use polyfmt::{new, Format, Options};
+//! # use std::str::FromStr;
 //! let some_flag = "plain".to_string(); // case-insensitive
 //! let format = Format::from_str(&some_flag).unwrap();
 //!
-//! let mut fmt = new(format, options).unwrap();
+//! let mut fmt = new(format, Options::default()).unwrap();
 //! ```
 //!
 //! ### Additional Details
