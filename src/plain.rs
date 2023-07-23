@@ -9,6 +9,12 @@ pub struct Plain {
     allowed_formats: Vec<Format>,
 }
 
+impl Drop for Plain {
+    fn drop(&mut self) {
+        self.finish();
+    }
+}
+
 impl Formatter for Plain {
     fn print(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Plain, &self.allowed_formats) {

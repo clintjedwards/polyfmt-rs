@@ -23,6 +23,12 @@ impl Default for Pretty {
     }
 }
 
+impl Drop for Pretty {
+    fn drop(&mut self) {
+        self.finish();
+    }
+}
+
 fn new_spinner() -> ProgressBar {
     let spinner = ProgressBar::new_spinner();
     spinner.enable_steady_tick(Duration::from_millis(120));
