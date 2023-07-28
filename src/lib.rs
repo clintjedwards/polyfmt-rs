@@ -153,7 +153,10 @@ pub trait Formatter: Debug {
 /// // You can also specify that certain lines be printed only when certain formatters are in effect.
 /// fmt.only(vec![Format::Plain]).err(&"test");
 /// ```
-pub fn new(format: Format, options: Options) -> Result<Box<dyn Formatter>, Box<dyn Error>> {
+pub fn new(
+    format: Format,
+    options: Options,
+) -> Result<Box<dyn Formatter>, Box<dyn Error + Send + Sync>> {
     match format {
         Format::Plain => {
             let mut formatter = plain::Plain::default();
@@ -209,8 +212,6 @@ mod tests {
         thread::sleep(ten_millis);
         fmt.warning(&"This is a warning message");
         thread::sleep(ten_millis);
-        let input = fmt.question(&"What is your name:");
-        fmt.println(&format!("Hi {input}!"));
         fmt.debugln(&"This is a debug message");
         fmt.err(&"This is an error message");
     }
