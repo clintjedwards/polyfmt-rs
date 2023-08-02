@@ -68,15 +68,18 @@
 //! # use polyfmt::{new, Format, Options};
 //! # let mut fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
 //! fmt.only(vec![Format::Plain]).print(&"test");
+//!
+//! // This will only print the string "test" if the formatter Format is "Plain".
 //! ```
 //!
-//! Alternatively, the global macros allow you to variadically list formats much like the only function:
+//! The global macros also allow you to variadically list formats to whitelist on the fly:
 //!
 //! ```rust
 //! # use polyfmt::{print, Format};
 //! print!("test", Format::Plain, Format::Pretty)
 //! ```
 //!
+//! ### Dynamically choosing a format
 //! Polyfmt is meant to be used as a formatter that is easy to be changed by the user.
 //! So most likely you'll want to automatically figure out which formatter you want from
 //! a flag of env_var the user passes in.
@@ -92,7 +95,11 @@
 //!
 //! ### Additional Details
 //!
-//! You can turn off color by using the popular `NO_COLOR` environment variable.
+//! * You can turn off color by using the popular `NO_COLOR` environment variable.
+//! * Anything to be printed must implement Display and Serialize due to the need to possibly print it into both plain
+//! plaintext and json.
+//! * When you finish using a formatter you should call the [finish](Formatter::finish) function. This flushes the output
+//! buffer and cleans up anything else before your program exists.
 
 mod json;
 mod macros;
@@ -114,10 +121,10 @@ pub enum Format {
 
     /// Outputs text in a more humanized fashion and provides spinners for longer actions.
     Pretty,
-    // /// Outputs json formatted text, mainly suitable to be read by computers.
+    /// Outputs json formatted text, mainly suitable to be read by computers.
     Json,
-    // /// Dummy formatter that doesn't print anything, can be used when users don't want any
-    // /// output at all.
+    /// Dummy formatter that doesn't print anything, can be used when users don't want any
+    /// output at all.
     Silent,
 }
 
@@ -142,7 +149,6 @@ impl<T: erased_serde::Serialize + Display> Displayable for T {
 }
 
 /// The core library trait.
-/// Most functions inside take just about any type and attempt to print them.
 pub trait Formatter: Debug + Send + Sync {
     /// Will attempt to intelligently print objects passed to it.
     ///
