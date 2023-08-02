@@ -16,30 +16,65 @@
 //!
 //! ## Usage
 //!
-//! Polyfmt provides a very simple API, full of print functions.
+//! Polyfmt provides a very simple API full of print functions.
 //!
+//! ### Using the global formatter
+//!
+//! The easiest way to use polyfmt is by using the global formatter:
+//!
+//! ```rust
+//! use polyfmt::println;
+//!
+//! println!("Hello from polyfmt");
+//! ```
+//!
+//! This is good for simple implementations but obviously the whole point of this library is being able to switch
+//! formatters. To do this you can still use a global formatter. (Which is available whereever polyfmt is imported)
+//!
+//!  ### Altering the global formatter
 //! Initiate a new formatter instance, passing in what type of formatter you want back. This is usually passed in
 //! by your user at runtime via flags or config.
 //!
-//! ```
-//! use polyfmt::{new, Format, Options};
+//! ```rust
+//! use polyfmt::{new, Format, Options, println};
 //!
-//! let mut fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
+//! let fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
+//! polyfmt::set_global_formatter(fmt);
 //!
 //! // Use the returned formatter to print a simple string.
 //!
-//! fmt.print(&"something");
+//! println!("something");
+//! // Output: `something`
 //! ```
-//! Output: `something`
+//!
+//! ### Using a scoped formatter
+//!
+//! Lastly you might want to just use a scoped formatter for specific instances. To do this you can just directly
+//! use the formatter you get back from the new function:
+//!
+//! ```rust
+//! use polyfmt::{new, Format, Options};
+//! let mut fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
+//! fmt.print(&"test");
+//! ```
+//!
+//! ### Filtering output
 //!
 //! Sometimes you'll want to output something only for specific formatters.
 //! You can use the [only](Formatter::only) function to list formatters for which
 //! the following print command will only print for those formatters.
 //!
-//! ```
+//! ```rust
 //! # use polyfmt::{new, Format, Options};
 //! # let mut fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
 //! fmt.only(vec![Format::Plain]).print(&"test");
+//! ```
+//!
+//! Alternatively, the global macros allow you to variadically list formats much like the only function:
+//!
+//! ```rust
+//! # use polyfmt::{print, Format};
+//! print!("test", Format::Plain, Format::Pretty)
 //! ```
 //!
 //! Polyfmt is meant to be used as a formatter that is easy to be changed by the user.
@@ -60,12 +95,15 @@
 //! You can turn off color by using the popular `NO_COLOR` environment variable.
 
 mod json;
+mod macros;
 mod plain;
 mod pretty;
 mod silent;
 
+use once_cell::sync::Lazy;
 use std::error::Error;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
+use std::sync::Mutex;
 use strum::EnumString;
 
 #[derive(Debug, EnumString, Clone, PartialEq, Eq)]
@@ -92,18 +130,20 @@ pub struct Options {
 /// Meant to represent types that can both be Serialized to JSON and implement the Display trait.
 /// This allows polyfmt to not only print input given to it, but intelligently parse types into JSON when the formatter
 /// requires it.
-pub trait Displayable: erased_serde::Serialize + std::fmt::Display {
+pub trait Displayable: erased_serde::Serialize + Display {
     fn as_serialize(&self) -> &(dyn erased_serde::Serialize);
 }
 
-// Blanket implementation for Displayable on any type that implements Serialize and Display.
-impl<T: erased_serde::Serialize + std::fmt::Display> Displayable for T {
+// Blanket implementation for Displayable on any type that implements the combination of traits that equal displayable.
+impl<T: erased_serde::Serialize + Display> Displayable for T {
     fn as_serialize(&self) -> &(dyn erased_serde::Serialize) {
         self as &(dyn erased_serde::Serialize)
     }
 }
 
-pub trait Formatter: Debug {
+/// The core library trait.
+/// Most functions inside take just about any type and attempt to print them.
+pub trait Formatter: Debug + Send + Sync {
     /// Will attempt to intelligently print objects passed to it.
     ///
     /// Note: For the spinner format this will add a new persistent message to
@@ -139,6 +179,24 @@ pub trait Formatter: Debug {
     fn only(&mut self, types: Vec<Format>) -> &mut dyn Formatter;
 
     fn finish(&self);
+}
+
+/// Instantiates a Global formatter for easy use. This formatter can be altered by the library
+/// user using `set_global_formatter`.
+static GLOBAL_FORMATTER: Lazy<Mutex<Box<dyn Formatter>>> = Lazy::new(|| {
+    let format = Format::Pretty;
+    let options = Options::default();
+    Mutex::new(new(format, options).unwrap())
+});
+
+/// Set the global formatter to a custom formatter.
+pub fn set_global_formatter(formtter: Box<dyn Formatter>) {
+    *GLOBAL_FORMATTER.lock().unwrap() = formtter;
+}
+
+/// Return the current global formatter. Mainly used for macros, should be unneeded for scoped formatters.
+pub fn get_global_formatter() -> &'static Mutex<Box<dyn Formatter>> {
+    &GLOBAL_FORMATTER
 }
 
 /// Constructs a new formatter of your choosing.
@@ -189,30 +247,68 @@ fn is_allowed(current_format: Format, allowed_formats: &Vec<Format>) -> bool {
     true
 }
 
-#[cfg(test)]
-mod tests {
+// #[cfg(test)]
+// mod tests {
 
-    use super::*;
-    use std::{str::FromStr, thread, time};
+//     use serde::Serialize;
 
-    #[test]
-    fn it_works() {
-        let options = Options { debug: true };
-        let ten_millis = time::Duration::from_secs(2);
+//     use super::{print, println, *};
+//     use std::{str::FromStr, thread, time};
 
-        let some_flag = "plain".to_string();
-        let format = Format::from_str(&some_flag).unwrap();
+//     // These tests aren't real tests, I just eyeball things to see if they work.
+//     // Maybe I'll write real tests, maybe I wont. Shut-up.
+//     #[test]
+//     fn global_easy() {
+//         let options = Options { debug: true };
+//         let ten_millis = time::Duration::from_secs(2);
 
-        let mut fmt = new(format, options).unwrap();
-        fmt.print(&"Demoing!");
-        fmt.println(&"Hello from polyfmt");
+//         let some_flag = "pretty".to_string();
+//         let format = Format::from_str(&some_flag).unwrap();
 
-        thread::sleep(ten_millis);
-        fmt.success(&"This is a successful message!");
-        thread::sleep(ten_millis);
-        fmt.warning(&"This is a warning message");
-        thread::sleep(ten_millis);
-        fmt.debugln(&"This is a debug message");
-        fmt.err(&"This is an error message");
-    }
-}
+//         let fmt = new(format, options).unwrap();
+//         set_global_formatter(fmt);
+
+//         print!("Demoing!");
+//         // question!("Test Question");
+
+//         println!("Hello from polyfmt");
+
+//         thread::sleep(ten_millis);
+//         success!("This is a successful message!");
+//         thread::sleep(ten_millis);
+//         warning!("This is a warning message");
+//         thread::sleep(ten_millis);
+//         debugln!("This is a debug message");
+//         err!("This is an error message");
+//         finish!();
+//     }
+
+// #[test]
+// fn it_works() {
+//     #[derive(Debug, Serialize)]
+//     pub struct Test {
+//         pub test: String,
+//     }
+
+//     let options = Options { debug: true };
+//     let ten_millis = time::Duration::from_secs(1);
+
+//     let some_flag = "pretty".to_string();
+//     let format = Format::from_str(&some_flag).unwrap();
+
+//     let mut fmt = new(format, options).unwrap();
+
+//     fmt.print(&"Demoing!");
+//     fmt.println(&"Hello from polyfmt");
+//     // fmt.question(&"What is your name?\n");
+
+//     thread::sleep(ten_millis);
+//     fmt.success(&"This is a successful message!");
+//     thread::sleep(ten_millis);
+//     fmt.warning(&"This is a warning message");
+//     thread::sleep(ten_millis);
+//     fmt.debugln(&"This is a debug message");
+//     fmt.err(&"This is an error message");
+//     fmt.finish();
+// }
+// }

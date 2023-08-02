@@ -23,12 +23,6 @@ impl Default for Pretty {
     }
 }
 
-impl Drop for Pretty {
-    fn drop(&mut self) {
-        self.finish();
-    }
-}
-
 fn new_spinner() -> ProgressBar {
     let spinner = ProgressBar::new_spinner();
     spinner.enable_steady_tick(Duration::from_millis(120));
@@ -125,20 +119,15 @@ impl Formatter for Pretty {
             return "".to_string();
         }
 
-        let spinner_copy = self.spinner.clone();
-
-        self.spinner.finish_and_clear();
-
-        print!("{} {msg} ", "?".magenta());
-
-        std::io::stdout().flush().unwrap();
-
         let mut input = String::from("");
 
-        let _ = std::io::stdin().read_line(&mut input);
-        input = input.trim().to_string();
+        self.spinner.suspend(|| {
+            print!("{} {msg}", "?".magenta());
 
-        self.spinner = spinner_copy;
+            std::io::stdout().flush().unwrap();
+
+            let _ = std::io::stdin().read_line(&mut input);
+        });
 
         defer! {
             self.allowed_formats = vec![];

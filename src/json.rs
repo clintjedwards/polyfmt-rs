@@ -9,12 +9,6 @@ pub struct Json {
     allowed_formats: Vec<Format>,
 }
 
-impl Drop for Json {
-    fn drop(&mut self) {
-        self.finish();
-    }
-}
-
 impl Formatter for Json {
     fn print(&mut self, msg: &dyn Displayable) {
         if self.allowed_formats.contains(&Format::Plain) {
