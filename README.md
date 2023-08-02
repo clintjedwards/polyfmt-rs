@@ -18,31 +18,63 @@ Polyfmt aims to simplify the API around multiple formatting options and make it 
 
 ## Usage
 
-Polyfmt provides a very simple API, full of print functions.
+Polyfmt provides a very simple API full of print functions.
+
+### Using the global formatter
+
+The easiest way to use polyfmt is by using the global formatter:
+
+```rust
+use polyfmt::println;
+println!("Hello from polyfmt");
+```
+
+This is good for simple implementations but obviously the whole point of this library is being able to switch
+formatters. To do this you can still use a global formatter. (Which is available whereever polyfmt is imported)
+
+### Altering the global formatter
 
 Initiate a new formatter instance, passing in what type of formatter you want back. This is usually passed in
 by your user at runtime via flags or config.
 
 ```rust
-use polyfmt::{new, Format, Options};
-
-let mut fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
-
+use polyfmt::{new, Format, Options, println};
+let fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
+polyfmt::set_global_formatter(fmt);
 // Use the returned formatter to print a simple string.
-
-fmt.print(&"something");
+println!("something");
+// Output: `something`
 ```
 
-Output: `something`
+### Using a scoped formatter
+
+Lastly you might want to just use a scoped formatter for specific instances. To do this you can just directly
+use the formatter you get back from the new function:
+
+```rust
+use polyfmt::{new, Format, Options};
+let mut fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
+fmt.print(&"test");
+```
+
+### Filtering output
 
 Sometimes you'll want to output something only for specific formatters.
 You can use the [only](Formatter::only) function to list formatters for which
 the following print command will only print for those formatters.
 
 ```rust
-...
 fmt.only(vec![Format::Plain]).print(&"test");
+// This will only print the string "test" if the formatter Format is "Plain".
 ```
+
+The global macros also allow you to variadically list formats to whitelist on the fly:
+
+```rust
+print!("test", Format::Plain, Format::Pretty)
+```
+
+### Dynamically choosing a format
 
 Polyfmt is meant to be used as a formatter that is easy to be changed by the user.
 So most likely you'll want to automatically figure out which formatter you want from
@@ -51,10 +83,13 @@ a flag of env_var the user passes in.
 ```rust
 let some_flag = "plain".to_string(); // case-insensitive
 let format = Format::from_str(&some_flag).unwrap();
-
-let mut fmt = new(format, options).unwrap();
+let mut fmt = new(format, Options::default()).unwrap();
 ```
 
 ### Additional Details
 
-You can turn off color by using the popular `NO_COLOR` environment variable.
+- You can turn off color by using the popular `NO_COLOR` environment variable.
+- Anything to be printed must implement Display and Serialize due to the need to possibly print it into both plain
+  plaintext and json.
+- When you finish using a formatter you should call the [finish](Formatter::finish) function. This flushes the output
+  buffer and cleans up anything else before your program exists.
