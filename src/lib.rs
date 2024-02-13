@@ -101,11 +101,11 @@
 //! * When you finish using a formatter you should call the [finish](Formatter::finish) function. This flushes the output
 //! buffer and cleans up anything else before your program exists.
 
-mod json;
-mod macros;
+// mod json;
+pub mod macros;
 mod plain;
-mod pretty;
-mod silent;
+// mod silent;
+// mod spinner;
 
 use once_cell::sync::Lazy;
 use std::error::Error;
@@ -116,17 +116,25 @@ use strum::EnumString;
 #[derive(Debug, EnumString, Clone, PartialEq, Eq)]
 #[strum(ascii_case_insensitive)]
 pub enum Format {
-    /// Outputs text in a humanized fashion without spinners.
+    /// Outputs text in a humanized fashion without any other additions.
     Plain,
+    // /// Outputs text in a more humanized fashion, providing tree box graphics on the left hand
+    // /// side of output.
+    // Tree,
 
-    /// Outputs text in a more humanized fashion and provides spinners for longer actions.
-    Pretty,
-    /// Outputs json formatted text, mainly suitable to be read by computers.
-    Json,
-    /// Dummy formatter that doesn't print anything, can be used when users don't want any
-    /// output at all.
-    Silent,
+    // /// Outputs text in a more humanized fashion, providing a spinner automatically.
+    // Spinner,
+
+    // /// Outputs json formatted text, mainly suitable to be read by computers.
+    // Json,
+
+    // /// Dummy formatter that doesn't print anything, can be used when users don't want any
+    // /// output at all.
+    // Silent,
 }
+
+/// Trait for the indentation guard.
+pub trait IndentGuard: Drop {}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Options {
@@ -170,7 +178,10 @@ pub trait Formatter: Debug + Send + Sync {
     fn warning(&mut self, msg: &dyn Displayable);
 
     /// Prints a message only if debug is turned on in the formatter options.
-    fn debugln(&mut self, msg: &dyn Displayable);
+    fn debug(&mut self, msg: &dyn Displayable);
+
+    /// Increases the indentation of output.
+    fn indent(&mut self) -> Box<dyn IndentGuard>;
 
     /// Prints the message noting it as a question to the user.
     /// It additionally also collects user input and returns it.
@@ -190,14 +201,14 @@ pub trait Formatter: Debug + Send + Sync {
 /// Instantiates a Global formatter for easy use. This formatter can be altered by the library
 /// user using `set_global_formatter`.
 static GLOBAL_FORMATTER: Lazy<Mutex<Box<dyn Formatter>>> = Lazy::new(|| {
-    let format = Format::Pretty;
+    let format = Format::Plain;
     let options = Options::default();
     Mutex::new(new(format, options).unwrap())
 });
 
 /// Set the global formatter to a custom formatter.
-pub fn set_global_formatter(formtter: Box<dyn Formatter>) {
-    *GLOBAL_FORMATTER.lock().unwrap() = formtter;
+pub fn set_global_formatter(formatter: Box<dyn Formatter>) {
+    *GLOBAL_FORMATTER.lock().unwrap() = formatter;
 }
 
 /// Return the current global formatter. Mainly used for macros, should be unneeded for scoped formatters.
@@ -226,21 +237,25 @@ pub fn new(
             let mut formatter = plain::Plain::default();
             formatter.debug = options.debug;
             Ok(Box::new(formatter))
-        }
-        Format::Pretty => {
-            let mut formatter = pretty::Pretty::default();
-            formatter.debug = options.debug;
-            Ok(Box::new(formatter))
-        }
-        Format::Json => {
-            let mut formatter = json::Json::default();
-            formatter.debug = options.debug;
-            Ok(Box::new(formatter))
-        }
-        Format::Silent => {
-            let formatter = silent::Silent {};
-            Ok(Box::new(formatter))
-        }
+        } // Format::Spinner => {
+          //     let mut formatter = spinner::Spinner::default();
+          //     formatter.debug = options.debug;
+          //     Ok(Box::new(formatter))
+          // }
+          // Format::Tree => {
+          //     let mut formatter = tree::Tree::default();
+          //     formatter.debug = options.debug;
+          //     Ok(Box::new(formatter))
+          // }
+          // Format::Json => {
+          //     let mut formatter = json::Json::default();
+          //     formatter.debug = options.debug;
+          //     Ok(Box::new(formatter))
+          // }
+          // Format::Silent => {
+          //     let formatter = silent::Silent {};
+          //     Ok(Box::new(formatter))
+          // }
     }
 }
 
@@ -253,68 +268,41 @@ fn is_allowed(current_format: Format, allowed_formats: &Vec<Format>) -> bool {
     true
 }
 
-// #[cfg(test)]
-// mod tests {
+#[cfg(test)]
+mod tests {
+    use crate::{debug, error, success, warning};
+    use std::{str::FromStr, thread, time};
 
-//     use serde::Serialize;
+    // These tests aren't real tests, I just eyeball things to see if they work.
+    // Maybe I'll write real tests, maybe I wont. Shut-up.
+    #[test]
+    fn global_easy() {
+        let options = crate::Options { debug: true };
+        let ten_millis = time::Duration::from_secs(2);
 
-//     use super::{print, println, *};
-//     use std::{str::FromStr, thread, time};
+        let some_flag = "plain".to_string();
+        let format = crate::Format::from_str(&some_flag).unwrap();
 
-//     // These tests aren't real tests, I just eyeball things to see if they work.
-//     // Maybe I'll write real tests, maybe I wont. Shut-up.
-//     #[test]
-//     fn global_easy() {
-//         let options = Options { debug: true };
-//         let ten_millis = time::Duration::from_secs(2);
+        let fmt = crate::new(format, options).unwrap();
+        crate::set_global_formatter(fmt);
 
-//         let some_flag = "pretty".to_string();
-//         let format = Format::from_str(&some_flag).unwrap();
+        print!("Demoing! ");
+        // question!("Test Question");
 
-//         let fmt = new(format, options).unwrap();
-//         set_global_formatter(fmt);
+        println!("Hello from polyfmt");
 
-//         print!("Demoing!");
-//         // question!("Test Question");
+        thread::sleep(ten_millis);
+        success!("{}", "This is a successful message!");
+        thread::sleep(ten_millis);
+        warning!("This is a warning message");
+        thread::sleep(ten_millis);
+        debug!("This is a debug message");
+        error!("This is an error message");
+    }
+}
 
-//         println!("Hello from polyfmt");
-
-//         thread::sleep(ten_millis);
-//         success!("This is a successful message!");
-//         thread::sleep(ten_millis);
-//         warning!("This is a warning message");
-//         thread::sleep(ten_millis);
-//         debugln!("This is a debug message");
-//         err!("This is an error message");
-//         finish!();
-//     }
-
-// #[test]
-// fn it_works() {
-//     #[derive(Debug, Serialize)]
-//     pub struct Test {
-//         pub test: String,
-//     }
-
-//     let options = Options { debug: true };
-//     let ten_millis = time::Duration::from_secs(1);
-
-//     let some_flag = "pretty".to_string();
-//     let format = Format::from_str(&some_flag).unwrap();
-
-//     let mut fmt = new(format, options).unwrap();
-
-//     fmt.print(&"Demoing!");
-//     fmt.println(&"Hello from polyfmt");
-//     // fmt.question(&"What is your name?\n");
-
-//     thread::sleep(ten_millis);
-//     fmt.success(&"This is a successful message!");
-//     thread::sleep(ten_millis);
-//     fmt.warning(&"This is a warning message");
-//     thread::sleep(ten_millis);
-//     fmt.debugln(&"This is a debug message");
-//     fmt.err(&"This is an error message");
-//     fmt.finish();
-// }
-// }
+// spinner
+// tree
+// plain
+// json
+// silent

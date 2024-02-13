@@ -1,4 +1,4 @@
-use crate::{is_allowed, Displayable, Format, Formatter};
+use crate::{is_allowed, Displayable, Format, Formatter, IndentGuard};
 use colored::Colorize;
 use scopeguard::defer;
 use std::io::Write;
@@ -6,7 +6,18 @@ use std::io::Write;
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Plain {
     pub debug: bool,
+    pub indentation: Vec<String>,
     allowed_formats: Vec<Format>,
+}
+
+struct Guard;
+
+impl IndentGuard for Guard {}
+
+impl Drop for Guard {
+    fn drop(&mut self) {
+        todo!()
+    }
 }
 
 impl Formatter for Plain {
@@ -75,7 +86,7 @@ impl Formatter for Plain {
         println!("{} {msg}", "!!".yellow());
     }
 
-    fn debugln(&mut self, msg: &dyn Displayable) {
+    fn debug(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Plain, &self.allowed_formats) || !self.debug {
             self.allowed_formats = vec![];
             return;
@@ -85,7 +96,12 @@ impl Formatter for Plain {
             self.allowed_formats = vec![];
         }
 
-        println!("{} {msg}", "DEBUG".on_yellow().dimmed());
+        println!("{} {msg}", "[debug]".on_yellow().dimmed());
+    }
+
+    fn indent(&mut self) -> Box<dyn IndentGuard> {
+        self.indentation.push("  ".to_string());
+        Box::new(Guard {})
     }
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
