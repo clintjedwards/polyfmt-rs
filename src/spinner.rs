@@ -1,35 +1,42 @@
 use crate::{format_text_length, is_allowed, Displayable, Format, Formatter, IndentGuard};
 use colored::Colorize;
+use indicatif::{ProgressBar, ProgressStyle};
 use scopeguard::defer;
 use std::sync::{Arc, Mutex, Weak};
-use std::{collections::HashSet, io::Write};
+use std::{collections::HashSet, io::Write, time::Duration};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct Plain {
+#[derive(Debug, Clone)]
+pub struct Spinner {
     debug: bool,
     indentation_level: u16,
     max_line_length: usize,
     allowed_formats: HashSet<Format>,
+
+    spinner: ProgressBar,
 }
 
-impl Plain {
-    pub fn new(debug: bool, max_line_length: usize) -> Arc<Mutex<Self>> {
-        Arc::new(Mutex::new(Plain {
+impl Spinner {
+    pub fn new(debug: bool, max_line_length: usize, padding: u16) -> Arc<Mutex<Self>> {
+        let spinner = new_spinner();
+
+        Arc::new(Mutex::new(Spinner {
             debug,
             max_line_length,
+            indentation_level: padding,
+            spinner,
             ..Default::default()
         }))
     }
 }
 
 struct Guard {
-    fmtter: Weak<Mutex<Plain>>,
+    spinner: Weak<Mutex<Spinner>>,
 }
 
 impl Guard {
-    fn new(fmtter: Arc<Mutex<Plain>>) -> Self {
+    fn new(spinner: Arc<Mutex<Spinner>>) -> Self {
         Self {
-            fmtter: Arc::downgrade(&fmtter),
+            spinner: Arc::downgrade(&spinner),
         }
     }
 }
@@ -38,48 +45,73 @@ impl IndentGuard for Guard {}
 
 impl Drop for Guard {
     fn drop(&mut self) {
-        if let Some(fmtter) = self.fmtter.upgrade() {
-            let mut fmtter_lock = fmtter.lock().unwrap();
-            fmtter_lock.outdent();
+        if let Some(spinner) = self.spinner.upgrade() {
+            let mut spinner_lock = spinner.lock().unwrap();
+            spinner_lock.outdent();
         }
     }
 }
 
-impl Plain {
+impl Default for Spinner {
+    fn default() -> Self {
+        let spinner = new_spinner();
+
+        Self {
+            debug: false,
+            allowed_formats: HashSet::new(),
+            max_line_length: 80,
+            indentation_level: 0,
+            spinner,
+        }
+    }
+}
+
+fn new_spinner() -> ProgressBar {
+    let spinner = ProgressBar::new_spinner();
+    spinner.enable_steady_tick(Duration::from_millis(120));
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
+    );
+    spinner
+}
+
+impl Spinner {
     fn print(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = HashSet::new();
             return;
         }
+
+        self.spinner.set_message(msg.to_string());
 
         defer! {
             self.allowed_formats = HashSet::new();
         }
-
-        print!("{msg}");
     }
 
     fn println(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = HashSet::new();
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+        let lines = format_text_length(msg, self.indentation_level, self.max_line_length);
 
         if lines.is_empty() {
             return;
         }
 
-        println!(
-            "  {}{}",
-            " ".repeat(self.indentation_level.into()),
-            lines.first().unwrap_or(&"".to_string()),
+        self.spinner.println(
+            " ".repeat(self.indentation_level.into()) + lines.first().unwrap_or(&"".to_string()),
         );
 
-        // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!("  {}{}", " ".repeat(self.indentation_level.into()), line);
+            self.spinner.println(format!(
+                "{}{}",
+                " ".repeat(self.indentation_level.into()),
+                line
+            ));
         }
 
         defer! {
@@ -88,7 +120,7 @@ impl Plain {
     }
 
     fn error(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = HashSet::new();
             return;
         }
@@ -99,20 +131,19 @@ impl Plain {
             return;
         }
 
-        println!(
+        self.spinner.println(format!(
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "x".red(),
-            lines.first().unwrap_or(&"".to_string()),
-        );
+            lines.first().unwrap_or(&"".to_string())
+        ));
 
-        // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            self.spinner.println(format!(
                 "{}{}",
                 " ".repeat((self.indentation_level + 2).into()),
                 line
-            );
+            ));
         }
 
         defer! {
@@ -121,7 +152,7 @@ impl Plain {
     }
 
     fn success(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = HashSet::new();
             return;
         }
@@ -132,20 +163,19 @@ impl Plain {
             return;
         }
 
-        println!(
+        self.spinner.println(format!(
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "✓".green(),
-            lines.first().unwrap_or(&"".to_string()),
-        );
+            lines.first().unwrap_or(&"".to_string())
+        ));
 
-        // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            self.spinner.println(format!(
                 "{}{}",
                 " ".repeat((self.indentation_level + 2).into()),
                 line
-            );
+            ));
         }
 
         defer! {
@@ -154,31 +184,30 @@ impl Plain {
     }
 
     fn warning(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = HashSet::new();
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 3, self.max_line_length);
+        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
 
         if lines.is_empty() {
             return;
         }
 
-        println!(
+        self.spinner.println(format!(
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "!!".yellow(),
-            lines.first().unwrap_or(&"".to_string()),
-        );
+            lines.first().unwrap_or(&"".to_string())
+        ));
 
-        // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
-                " {}{}",
-                " ".repeat((self.indentation_level + 2).into()),
+            self.spinner.println(format!(
+                "{}{}",
+                " ".repeat((self.indentation_level + 3).into()),
                 line
-            );
+            ));
         }
 
         defer! {
@@ -186,8 +215,23 @@ impl Plain {
         }
     }
 
+    fn indent(spinner: &Arc<Mutex<Self>>) -> Box<dyn IndentGuard> {
+        let mut fmt = spinner.lock().unwrap();
+        fmt.indentation_level += 1;
+        drop(fmt);
+        let cloned_spinner = Arc::clone(spinner);
+        let guard = Guard::new(cloned_spinner);
+        Box::new(guard)
+    }
+
+    fn outdent(&mut self) {
+        if self.indentation_level > 0 {
+            self.indentation_level -= 1;
+        }
+    }
+
     fn debug(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) || !self.debug {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) || !self.debug {
             self.allowed_formats = HashSet::new();
             return;
         }
@@ -198,20 +242,19 @@ impl Plain {
             return;
         }
 
-        println!(
+        self.spinner.println(format!(
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "[debug]".dimmed(),
-            lines.first().unwrap_or(&"".to_string()),
-        );
+            lines.first().unwrap_or(&"".to_string())
+        ));
 
-        // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
-                "{} {}",
-                " ".repeat((self.indentation_level + 7).into()),
+            self.spinner.println(format!(
+                "{}{}",
+                " ".repeat((self.indentation_level + 8).into()),
                 line
-            );
+            ));
         }
 
         defer! {
@@ -219,74 +262,40 @@ impl Plain {
         }
     }
 
-    fn indent(fmtter: &Arc<Mutex<Self>>) -> Box<dyn IndentGuard> {
-        let mut fmt = fmtter.lock().unwrap();
-        fmt.indentation_level += 1;
-        drop(fmt);
-        let cloned_fmtter = Arc::clone(fmtter);
-        let guard = Guard::new(cloned_fmtter);
-        Box::new(guard)
-    }
-
-    fn outdent(&mut self) {
-        if self.indentation_level > 0 {
-            self.indentation_level -= 1;
-        }
-    }
-
     fn question(&mut self, msg: &dyn Displayable) -> String {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = HashSet::new();
             return "".to_string();
         }
 
         let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
 
-        if lines.len() == 1 {
-            print!(
-                "{}{} {} ",
-                " ".repeat(self.indentation_level.into()),
-                "?".magenta(),
-                lines.first().unwrap_or(&"".to_string()),
-            );
-        } else {
-            println!(
+        let mut input = String::from("");
+
+        self.spinner.suspend(|| {
+            self.spinner.println(format!(
                 "{}{} {}",
                 " ".repeat(self.indentation_level.into()),
                 "?".magenta(),
-                lines.first().unwrap_or(&"".to_string()),
-            );
+                lines.first().unwrap_or(&"".to_string())
+            ));
 
-            // Print the remaining lines except the last with println!
-            let lines_count = lines.len();
-            for (index, line) in lines.iter().enumerate().skip(1) {
-                if index + 1 < lines_count {
-                    // Not the last line
-                    println!(
-                        "{}{}",
-                        " ".repeat((self.indentation_level + 2).into()),
-                        line
-                    );
-                } else {
-                    // Last line, use print! instead
-                    print!(
-                        "{}{} ",
-                        " ".repeat((self.indentation_level + 2).into()),
-                        line
-                    );
-                }
+            for line in lines.iter().skip(1) {
+                self.spinner.println(format!(
+                    "{}{}",
+                    " ".repeat((self.indentation_level + 2).into()),
+                    line
+                ));
             }
-        }
+
+            std::io::stdout().flush().unwrap();
+
+            let _ = std::io::stdin().read_line(&mut input);
+        });
 
         defer! {
             self.allowed_formats = HashSet::new();
         }
-
-        std::io::stdout().flush().unwrap();
-
-        let mut input = String::from("");
-
-        let _ = std::io::stdin().read_line(&mut input);
 
         input.trim().to_string()
     }
@@ -297,11 +306,11 @@ impl Plain {
     }
 
     fn finish(&self) {
-        std::io::stdout().flush().unwrap();
+        self.spinner.finish_and_clear();
     }
 }
 
-impl Formatter for Arc<Mutex<Plain>> {
+impl Formatter for Arc<Mutex<Spinner>> {
     fn print(&mut self, msg: &dyn Displayable) {
         let mut fmt = self.lock().unwrap();
         fmt.print(msg);
@@ -333,7 +342,7 @@ impl Formatter for Arc<Mutex<Plain>> {
     }
 
     fn indent(&mut self) -> Box<dyn IndentGuard> {
-        Plain::indent(self)
+        Spinner::indent(self)
     }
 
     fn outdent(&mut self) {

@@ -4,3 +4,5 @@
 - Drop doesn't seem to work.
 - We could possibly gate json behind a flag so if you don't need it you don't have to pull in serde.
 - I wasn't able to get drop to properly handle finish_and_clear. FOr the global it would run immediately.
+- macros need a way to span
+- Finishe macros in general
