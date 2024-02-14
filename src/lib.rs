@@ -101,36 +101,47 @@
 //! * When you finish using a formatter you should call the [finish](Formatter::finish) function. This flushes the output
 //! buffer and cleans up anything else before your program exists.
 
-// mod json;
+mod json;
 pub mod macros;
 mod plain;
-// mod silent;
-// mod spinner;
+mod silent;
+mod spinner;
+mod tree;
 
+use anyhow::{bail, Result};
+use colored::Colorize;
+use indicatif::{ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
-use std::error::Error;
-use std::fmt::{Debug, Display};
-use std::sync::Mutex;
+use std::{
+    collections::HashMap,
+    error::Error,
+    fmt::{Debug, Display},
+    io::Write,
+    sync::Mutex,
+    time::Duration,
+};
 use strum::EnumString;
+use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 
 #[derive(Debug, EnumString, Clone, PartialEq, Eq)]
 #[strum(ascii_case_insensitive)]
 pub enum Format {
     /// Outputs text in a humanized fashion without any other additions.
     Plain,
-    // /// Outputs text in a more humanized fashion, providing tree box graphics on the left hand
-    // /// side of output.
-    // Tree,
 
-    // /// Outputs text in a more humanized fashion, providing a spinner automatically.
-    // Spinner,
+    /// Outputs text in a more humanized fashion, providing tree box graphics on the left hand
+    /// side of output.
+    Tree,
 
-    // /// Outputs json formatted text, mainly suitable to be read by computers.
-    // Json,
+    /// Outputs text in a more humanized fashion, providing a spinner automatically.
+    Spinner,
 
-    // /// Dummy formatter that doesn't print anything, can be used when users don't want any
-    // /// output at all.
-    // Silent,
+    /// Outputs json formatted text, mainly suitable to be read by computers.
+    Json,
+
+    /// Dummy formatter that doesn't print anything, can be used when users don't want any
+    /// output at all.
+    Silent,
 }
 
 /// Trait for the indentation guard.
@@ -169,7 +180,7 @@ pub trait Formatter: Debug + Send + Sync {
     fn println(&mut self, msg: &dyn Displayable);
 
     /// Prints the message noting it as an error to the user.
-    fn err(&mut self, msg: &dyn Displayable);
+    fn error(&mut self, msg: &dyn Displayable);
 
     /// Prints the message noting it as an error to the user.
     fn success(&mut self, msg: &dyn Displayable);
@@ -237,25 +248,26 @@ pub fn new(
             let mut formatter = plain::Plain::default();
             formatter.debug = options.debug;
             Ok(Box::new(formatter))
-        } // Format::Spinner => {
-          //     let mut formatter = spinner::Spinner::default();
-          //     formatter.debug = options.debug;
-          //     Ok(Box::new(formatter))
-          // }
-          // Format::Tree => {
-          //     let mut formatter = tree::Tree::default();
-          //     formatter.debug = options.debug;
-          //     Ok(Box::new(formatter))
-          // }
-          // Format::Json => {
-          //     let mut formatter = json::Json::default();
-          //     formatter.debug = options.debug;
-          //     Ok(Box::new(formatter))
-          // }
-          // Format::Silent => {
-          //     let formatter = silent::Silent {};
-          //     Ok(Box::new(formatter))
-          // }
+        }
+        Format::Spinner => {
+            let mut formatter = spinner::Spinner::default();
+            formatter.debug = options.debug;
+            Ok(Box::new(formatter))
+        }
+        Format::Tree => {
+            let mut formatter = tree::Tree::default();
+            formatter.debug = options.debug;
+            Ok(Box::new(formatter))
+        }
+        Format::Json => {
+            let mut formatter = json::Json::default();
+            formatter.debug = options.debug;
+            Ok(Box::new(formatter))
+        }
+        Format::Silent => {
+            let formatter = silent::Silent {};
+            Ok(Box::new(formatter))
+        }
     }
 }
 
@@ -268,17 +280,185 @@ fn is_allowed(current_format: Format, allowed_formats: &Vec<Format>) -> bool {
     true
 }
 
+/// Enables the spinner to automatically clean itself up, when dropped.
+pub struct Spinner {
+    internal: ProgressBar,
+}
+
+impl Drop for Spinner {
+    fn drop(&mut self) {
+        self.internal.finish_and_clear();
+    }
+}
+
+impl Spinner {
+    pub fn create(initial_message: &str) -> Spinner {
+        let spinner = ProgressBar::new_spinner();
+        spinner.enable_steady_tick(Duration::from_millis(120));
+        spinner.set_style(
+            ProgressStyle::default_spinner()
+                .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
+        );
+        spinner.set_message(initial_message.to_string());
+
+        Spinner { internal: spinner }
+    }
+
+    pub fn set_message(&self, msg: String) {
+        self.internal.set_message(msg);
+    }
+
+    pub fn suspend<F: FnOnce() -> T, T>(&self, f: F) -> T {
+        self.internal.suspend(f)
+    }
+}
+
+/// Creates a TUI multiple choice modal.
+/// The Hashmap passed in is the mapping of label to actual raw value. This is helpful when you want the raw value
+/// for passing in to another function but the label to display to the user.
+/// Returns the (label, value) tuple that the user chose.
+pub fn display_chooser(choices: HashMap<String, String>) -> Result<(String, String)> {
+    let mut labels: Vec<_> = choices.keys().collect();
+    labels.sort();
+
+    let mut selected_index = 0;
+
+    display_choices(&labels, selected_index);
+
+    // Get the standard input stream.
+    let stdin = std::io::stdin();
+    // Get the standard output stream and go to raw mode.
+    let mut stdout = std::io::stdout().into_raw_mode()?;
+
+    for c in stdin.keys() {
+        match c? {
+            Key::Ctrl('c') => break,
+            Key::Up if selected_index > 0 => {
+                selected_index -= 1;
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::cursor::Up(labels.len() as u16),
+                    termion::clear::AfterCursor
+                )?;
+                display_choices(&labels, selected_index);
+            }
+            Key::Down if selected_index < labels.len() - 1 => {
+                selected_index += 1;
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::cursor::Up(labels.len() as u16),
+                    termion::clear::AfterCursor
+                )?;
+                display_choices(&labels, selected_index);
+            }
+            Key::Char('\n') => {
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::cursor::Up(labels.len() as u16),
+                    termion::clear::AfterCursor
+                )?;
+                write!(stdout, "{}", termion::cursor::Show)?;
+                stdout.flush()?;
+
+                return Ok((
+                    labels[selected_index].to_string(),
+                    choices[labels[selected_index]].clone(),
+                ));
+            }
+            _ => {}
+        }
+        stdout.flush()?;
+    }
+
+    bail!("display chooser was interrupted before ending properly")
+}
+
+fn display_choices(choices: &[&String], selected: usize) {
+    for (index, choice) in choices.iter().enumerate() {
+        if index == selected {
+            _ = write!(std::io::stdout(), "{} {}\r\n", ">".green(), choice.green());
+        } else {
+            _ = write!(std::io::stdout(), "  {}\r\n", choice);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{debug, error, success, warning};
+    use crate::{debug, error, question, success, warning};
     use std::{str::FromStr, thread, time};
+
+    #[test]
+    fn spinner() {
+        let options = crate::Options { debug: true };
+        let ten_millis = time::Duration::from_secs(1);
+
+        let some_flag = "spinner".to_string();
+        let format = crate::Format::from_str(&some_flag).unwrap();
+
+        let mut fmt = crate::new(format, options).unwrap();
+
+        fmt.print(&"Demoing! ");
+        thread::sleep(ten_millis);
+
+        fmt.println(&"Hello from polyfmt");
+        thread::sleep(ten_millis);
+
+        fmt.success(&"This is a successful message!");
+        thread::sleep(ten_millis);
+
+        fmt.warning(&"This is a warning message");
+        thread::sleep(ten_millis);
+
+        fmt.debug(&"This is a debug message");
+        thread::sleep(ten_millis);
+
+        fmt.error(&"This is an error message");
+    }
+
+    #[test]
+    fn json() {
+        let options = crate::Options { debug: true };
+
+        let some_flag = "json".to_string();
+        let format = crate::Format::from_str(&some_flag).unwrap();
+
+        let mut fmt = crate::new(format, options).unwrap();
+
+        fmt.print(&"Demoing! ");
+        fmt.println(&"Hello from polyfmt");
+        fmt.success(&"This is a successful message!");
+        fmt.warning(&"This is a warning message");
+        fmt.debug(&"This is a debug message");
+        fmt.error(&"This is an error message");
+    }
+
+    #[test]
+    fn plain() {
+        let options = crate::Options { debug: true };
+
+        let some_flag = "plain".to_string();
+        let format = crate::Format::from_str(&some_flag).unwrap();
+
+        let mut fmt = crate::new(format, options).unwrap();
+
+        fmt.print(&"Demoing! ");
+        fmt.println(&"Hello from polyfmt");
+        fmt.success(&"This is a successful message!");
+        fmt.warning(&"This is a warning message");
+        fmt.debug(&"This is a debug message");
+        fmt.error(&"This is an error message");
+    }
 
     // These tests aren't real tests, I just eyeball things to see if they work.
     // Maybe I'll write real tests, maybe I wont. Shut-up.
     #[test]
     fn global_easy() {
         let options = crate::Options { debug: true };
-        let ten_millis = time::Duration::from_secs(2);
+        let ten_millis = time::Duration::from_secs(1);
 
         let some_flag = "plain".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
@@ -287,7 +467,6 @@ mod tests {
         crate::set_global_formatter(fmt);
 
         print!("Demoing! ");
-        // question!("Test Question");
 
         println!("Hello from polyfmt");
 
@@ -300,9 +479,3 @@ mod tests {
         error!("This is an error message");
     }
 }
-
-// spinner
-// tree
-// plain
-// json
-// silent

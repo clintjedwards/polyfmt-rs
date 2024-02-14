@@ -1,23 +1,35 @@
-use crate::{is_allowed, Displayable, Format, Formatter};
+use crate::{is_allowed, Displayable, Format, Formatter, IndentGuard};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use scopeguard::defer;
 use std::{io::Write, time::Duration};
 
 #[derive(Debug, Clone)]
-pub struct Pretty {
+pub struct Spinner {
     pub debug: bool,
     allowed_formats: Vec<Format>,
+    indentation: Vec<String>,
     spinner: ProgressBar,
 }
 
-impl Default for Pretty {
+struct Guard;
+
+impl IndentGuard for Guard {}
+
+impl Drop for Guard {
+    fn drop(&mut self) {
+        todo!()
+    }
+}
+
+impl Default for Spinner {
     fn default() -> Self {
         let spinner = new_spinner();
 
         Self {
             debug: false,
             allowed_formats: vec![],
+            indentation: vec![],
             spinner,
         }
     }
@@ -33,9 +45,9 @@ fn new_spinner() -> ProgressBar {
     spinner
 }
 
-impl Formatter for Pretty {
+impl Formatter for Spinner {
     fn print(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Pretty, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = vec![];
             return;
         }
@@ -48,7 +60,7 @@ impl Formatter for Pretty {
     }
 
     fn println(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Pretty, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = vec![];
             return;
         }
@@ -60,8 +72,8 @@ impl Formatter for Pretty {
         }
     }
 
-    fn err(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Pretty, &self.allowed_formats) {
+    fn error(&mut self, msg: &dyn Displayable) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = vec![];
             return;
         }
@@ -74,7 +86,7 @@ impl Formatter for Pretty {
     }
 
     fn success(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Pretty, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = vec![];
             return;
         }
@@ -87,7 +99,7 @@ impl Formatter for Pretty {
     }
 
     fn warning(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Pretty, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = vec![];
             return;
         }
@@ -99,14 +111,19 @@ impl Formatter for Pretty {
         }
     }
 
-    fn debugln(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Pretty, &self.allowed_formats) || !self.debug {
+    fn indent(&mut self) -> Box<dyn IndentGuard> {
+        self.indentation.push("  ".to_string());
+        Box::new(Guard {})
+    }
+
+    fn debug(&mut self, msg: &dyn Displayable) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) || !self.debug {
             self.allowed_formats = vec![];
             return;
         }
 
         self.spinner
-            .println(format!("{} {msg}", "DEBUG".on_yellow().dimmed()));
+            .println(format!("{} {msg}", "[debug]".dimmed()));
 
         defer! {
             self.allowed_formats = vec![];
@@ -114,7 +131,7 @@ impl Formatter for Pretty {
     }
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
-        if !is_allowed(Format::Pretty, &self.allowed_formats) {
+        if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = vec![];
             return "".to_string();
         }

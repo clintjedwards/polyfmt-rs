@@ -1,11 +1,22 @@
-use crate::{Displayable, Format, Formatter};
+use crate::{Displayable, Format, Formatter, IndentGuard};
 use scopeguard::defer;
 use serde_json::json;
 use std::io::Write;
 
+struct Guard;
+
+impl IndentGuard for Guard {}
+
+impl Drop for Guard {
+    fn drop(&mut self) {
+        todo!()
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Json {
     pub debug: bool,
+    indentation: Vec<String>,
     allowed_formats: Vec<Format>,
 }
 
@@ -50,7 +61,7 @@ impl Formatter for Json {
         }
     }
 
-    fn err(&mut self, msg: &dyn Displayable) {
+    fn error(&mut self, msg: &dyn Displayable) {
         if self.allowed_formats.contains(&Format::Plain) && !self.allowed_formats.is_empty() {
             return;
         }
@@ -110,7 +121,7 @@ impl Formatter for Json {
         }
     }
 
-    fn debugln(&mut self, msg: &dyn Displayable) {
+    fn debug(&mut self, msg: &dyn Displayable) {
         if (self.allowed_formats.contains(&Format::Plain) && !self.allowed_formats.is_empty())
             || !self.debug
         {
@@ -130,6 +141,11 @@ impl Formatter for Json {
             Ok(s) => println!("{s}"),
             Err(e) => println!("Error serializing to JSON: {e:?}"),
         }
+    }
+
+    fn indent(&mut self) -> Box<dyn IndentGuard> {
+        self.indentation.push("  ".to_string());
+        Box::new(Guard {})
     }
 
     fn question(&mut self, msg: &dyn Displayable) -> String {

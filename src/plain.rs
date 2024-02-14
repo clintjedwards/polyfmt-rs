@@ -47,7 +47,7 @@ impl Formatter for Plain {
         println!("{msg}");
     }
 
-    fn err(&mut self, msg: &dyn Displayable) {
+    fn error(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Plain, &self.allowed_formats) {
             self.allowed_formats = vec![];
             return;
@@ -96,7 +96,7 @@ impl Formatter for Plain {
             self.allowed_formats = vec![];
         }
 
-        println!("{} {msg}", "[debug]".on_yellow().dimmed());
+        println!("{} {msg}", "[debug]".dimmed());
     }
 
     fn indent(&mut self) -> Box<dyn IndentGuard> {
