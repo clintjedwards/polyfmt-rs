@@ -155,6 +155,8 @@ impl Formatter for Json {
         Box::new(Guard {})
     }
 
+    fn outdent(&mut self) {}
+
     fn question(&mut self, msg: &dyn Displayable) -> String {
         if self.allowed_formats.contains(&Format::Plain) && !self.allowed_formats.is_empty() {
             return "".to_string();

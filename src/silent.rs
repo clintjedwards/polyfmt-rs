@@ -23,6 +23,7 @@ impl Formatter for Silent {
     fn indent(&mut self) -> Box<dyn crate::IndentGuard> {
         Box::new(Guard {})
     }
+    fn outdent(&mut self) {}
 
     fn question(&mut self, _msg: &dyn Displayable) -> String {
         "".to_string()

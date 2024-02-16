@@ -206,6 +206,9 @@ pub trait Formatter: Debug + Send + Sync {
     /// Increases the indentation of output.
     fn indent(&mut self) -> Box<dyn IndentGuard>;
 
+    /// Decreases the indentation of output.
+    fn outdent(&mut self);
+
     /// Prints the message noting it as a question to the user.
     /// It additionally also collects user input and returns it.
     ///
@@ -462,7 +465,15 @@ mod tests {
         fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.question(&"Hello from polyfmt, Look at how well it breaks up lines!");
+
+        let _guard = fmt.indent();
+        println!();
+
+        fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
     }
 
     #[test]
@@ -527,15 +538,6 @@ mod tests {
         let format = crate::Format::from_str(&some_flag).unwrap();
 
         let mut fmt = crate::new(format, Some(options)).unwrap();
-
-        fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
-
-        let _guard = fmt.indent();
-        println!();
 
         fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");

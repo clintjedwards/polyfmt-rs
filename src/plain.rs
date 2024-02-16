@@ -58,7 +58,7 @@ impl Formatter for Plain {
         }
 
         println!(
-            "{}{}",
+            " {}{}",
             " ".repeat(self.indentation_level.into()),
             lines.first().unwrap(),
         );
@@ -71,8 +71,6 @@ impl Formatter for Plain {
         defer! {
             self.allowed_formats = HashSet::new();
         }
-
-        println!("{msg}");
     }
 
     fn error(&mut self, msg: &dyn Displayable) {
@@ -81,11 +79,27 @@ impl Formatter for Plain {
             return;
         }
 
+        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+
+        if lines.is_empty() {
+            return;
+        }
+
+        println!(
+            " {}{} {}",
+            " ".repeat(self.indentation_level.into()),
+            "x".red(),
+            lines.first().unwrap(),
+        );
+
+        // Print the remaining lines
+        for line in lines.iter().skip(1) {
+            println!("{}   {}", " ".repeat(self.indentation_level.into()), line);
+        }
+
         defer! {
             self.allowed_formats = HashSet::new();
         }
-
-        println!("{} {msg}", "x".red());
     }
 
     fn success(&mut self, msg: &dyn Displayable) {
@@ -94,11 +108,27 @@ impl Formatter for Plain {
             return;
         }
 
+        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+
+        if lines.is_empty() {
+            return;
+        }
+
+        println!(
+            " {}{} {}",
+            " ".repeat(self.indentation_level.into()),
+            "✓".green(),
+            lines.first().unwrap(),
+        );
+
+        // Print the remaining lines
+        for line in lines.iter().skip(1) {
+            println!("{}   {}", " ".repeat(self.indentation_level.into()), line);
+        }
+
         defer! {
             self.allowed_formats = HashSet::new();
         }
-
-        println!("{} {msg}", "✓".green());
     }
 
     fn warning(&mut self, msg: &dyn Displayable) {
@@ -107,11 +137,27 @@ impl Formatter for Plain {
             return;
         }
 
+        let lines = format_text_length(msg, self.indentation_level + 3, self.max_line_length);
+
+        if lines.is_empty() {
+            return;
+        }
+
+        println!(
+            " {}{} {}",
+            " ".repeat(self.indentation_level.into()),
+            "!!".yellow(),
+            lines.first().unwrap(),
+        );
+
+        // Print the remaining lines
+        for line in lines.iter().skip(1) {
+            println!("{}   {}", " ".repeat(self.indentation_level.into()), line);
+        }
+
         defer! {
             self.allowed_formats = HashSet::new();
         }
-
-        println!("{} {msg}", "!!".yellow());
     }
 
     fn debug(&mut self, msg: &dyn Displayable) {
@@ -120,16 +166,38 @@ impl Formatter for Plain {
             return;
         }
 
+        let lines = format_text_length(msg, self.indentation_level + 8, self.max_line_length);
+
+        if lines.is_empty() {
+            return;
+        }
+
+        println!(
+            " {}{} {}",
+            " ".repeat(self.indentation_level.into()),
+            "[debug]".dimmed(),
+            lines.first().unwrap(),
+        );
+
+        // Print the remaining lines
+        for line in lines.iter().skip(1) {
+            println!("{}   {}", " ".repeat(self.indentation_level.into()), line);
+        }
+
         defer! {
             self.allowed_formats = HashSet::new();
         }
-
-        println!("{} {msg}", "[debug]".dimmed());
     }
 
     fn indent(&mut self) -> Box<dyn IndentGuard> {
         self.indentation_level += 1;
         Box::new(Guard {})
+    }
+
+    fn outdent(&mut self) {
+        if self.indentation_level > 0 {
+            self.indentation_level -= 1;
+        }
     }
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
@@ -138,11 +206,23 @@ impl Formatter for Plain {
             return "".to_string();
         }
 
+        let lines = format_text_length(msg, self.indentation_level + 8, self.max_line_length);
+
+        println!(
+            " {}{} {}",
+            " ".repeat(self.indentation_level.into()),
+            "?".magenta(),
+            lines.first().unwrap(),
+        );
+
+        // Print the remaining lines
+        for line in lines.iter().skip(1) {
+            println!("{}   {}", " ".repeat(self.indentation_level.into()), line);
+        }
+
         defer! {
             self.allowed_formats = HashSet::new();
         }
-
-        print!("{} {msg} ", "?".magenta());
 
         std::io::stdout().flush().unwrap();
 

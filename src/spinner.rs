@@ -130,6 +130,12 @@ impl Formatter for Spinner {
         Box::new(Guard {})
     }
 
+    fn outdent(&mut self) {
+        if self.indentation_level > 0 {
+            self.indentation_level -= 1;
+        }
+    }
+
     fn debug(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Spinner, &self.allowed_formats) || !self.debug {
             self.allowed_formats = HashSet::new();

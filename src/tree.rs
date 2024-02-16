@@ -3,6 +3,7 @@ use colored::Colorize;
 use scopeguard::defer;
 use std::collections::HashSet;
 use std::io::Write;
+use std::sync::{Arc, Mutex, Weak};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Tree {
@@ -14,28 +15,43 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn new(debug: bool, max_line_length: usize) -> Tree {
-        Tree {
+    pub fn new(debug: bool, max_line_length: usize) -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(Tree {
             debug,
             max_line_length,
             ..Default::default()
-        }
+        }))
     }
 }
 
-struct Guard;
+struct Guard {
+    tree: Weak<Mutex<Tree>>,
+}
+
+impl Guard {
+    pub fn new(tree: &Arc<Mutex<Tree>>) -> Guard {
+        Guard {
+            tree: Arc::downgrade(tree),
+        }
+    }
+}
 
 impl IndentGuard for Guard {}
 
 impl Drop for Guard {
     fn drop(&mut self) {
-        todo!()
+        if let Some(tree) = self.tree.upgrade() {
+            let mut tree = tree.lock().unwrap();
+            tree.outdent();
+        }
     }
 }
 
-impl Formatter for Tree {
+impl Formatter for Arc<Mutex<Tree>> {
     fn print(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Tree, &self.allowed_formats) {
+        let fmt = self.lock().unwrap();
+
+        if !is_allowed(Format::Tree, &fmt.allowed_formats) {
             self.allowed_formats = HashSet::new();
             return;
         }
@@ -63,14 +79,14 @@ impl Formatter for Tree {
             println!(
                 "{}{} {}",
                 "├─".magenta(),
-                "─".repeat(self.indentation_level.into()),
+                format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
                 lines.first().unwrap(),
             );
         } else {
             println!(
                 "{}{} {}",
                 "┌─".magenta(),
-                "─".repeat(self.indentation_level.into()),
+                format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
                 lines.first().unwrap(),
             );
         }
@@ -105,7 +121,7 @@ impl Formatter for Tree {
         println!(
             "{}{} {} {}",
             "├─".magenta(),
-            "─".repeat(self.indentation_level.into()),
+            format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
             "x".red(),
             lines.first().unwrap()
         );
@@ -140,7 +156,7 @@ impl Formatter for Tree {
         println!(
             "{}{} {} {}",
             "├─".magenta(),
-            "─".repeat(self.indentation_level.into()),
+            format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
             "✓".green(),
             lines.first().unwrap()
         );
@@ -175,7 +191,7 @@ impl Formatter for Tree {
         println!(
             "{}{} {} {}",
             "├─".magenta(),
-            "─".repeat(self.indentation_level.into()),
+            format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
             "!!".yellow(),
             lines.first().unwrap()
         );
@@ -210,7 +226,7 @@ impl Formatter for Tree {
         println!(
             "{}{} {} {}",
             "├─".magenta(),
-            "─".repeat(self.indentation_level.into()),
+            format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
             "[debug]".dimmed(),
             lines.first().unwrap()
         );
@@ -231,8 +247,15 @@ impl Formatter for Tree {
     }
 
     fn indent(&mut self) -> Box<dyn IndentGuard> {
-        self.indentation_level += 1;
-        Box::new(Guard {})
+        let mut tree = self.lock().unwrap();
+        tree.indentation_level += 1;
+        Guard::new(tree)
+    }
+
+    fn outdent(&mut self) {
+        if self.indentation_level > 0 {
+            self.indentation_level -= 1;
+        }
     }
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
@@ -246,7 +269,7 @@ impl Formatter for Tree {
         println!(
             "{}{} {} {}",
             "├─".magenta(),
-            "─".repeat(self.indentation_level.into()),
+            format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
             "?".magenta(),
             lines.first().unwrap()
         );
