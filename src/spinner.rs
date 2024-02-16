@@ -2,14 +2,27 @@ use crate::{is_allowed, Displayable, Format, Formatter, IndentGuard};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use scopeguard::defer;
-use std::{io::Write, time::Duration};
+use std::{collections::HashSet, io::Write, time::Duration};
 
 #[derive(Debug, Clone)]
 pub struct Spinner {
-    pub debug: bool,
-    allowed_formats: Vec<Format>,
-    indentation: Vec<String>,
+    debug: bool,
+    allowed_formats: HashSet<Format>,
+    max_line_length: usize,
+    indentation_level: u16,
     spinner: ProgressBar,
+}
+
+impl Spinner {
+    pub fn new(debug: bool, max_line_length: usize) -> Spinner {
+        let spinner = new_spinner();
+
+        Spinner {
+            debug,
+            max_line_length,
+            ..Default::default()
+        }
+    }
 }
 
 struct Guard;
@@ -28,8 +41,9 @@ impl Default for Spinner {
 
         Self {
             debug: false,
-            allowed_formats: vec![],
-            indentation: vec![],
+            allowed_formats: HashSet::new(),
+            max_line_length: 80,
+            indentation_level: 0,
             spinner,
         }
     }
@@ -48,77 +62,77 @@ fn new_spinner() -> ProgressBar {
 impl Formatter for Spinner {
     fn print(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Spinner, &self.allowed_formats) {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
             return;
         }
 
         self.spinner.set_message(msg.to_string());
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
     }
 
     fn println(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Spinner, &self.allowed_formats) {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
             return;
         }
 
         self.spinner.println(format!("{msg}"));
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
     }
 
     fn error(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Spinner, &self.allowed_formats) {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
             return;
         }
 
         self.spinner.println(format!("{} {msg}", "x".red()));
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
     }
 
     fn success(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Spinner, &self.allowed_formats) {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
             return;
         }
 
         self.spinner.println(format!("{} {msg}", "✓".green()));
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
     }
 
     fn warning(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Spinner, &self.allowed_formats) {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
             return;
         }
 
         self.spinner.println(format!("{} {msg}", "!!".yellow()));
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
     }
 
     fn indent(&mut self) -> Box<dyn IndentGuard> {
-        self.indentation.push("  ".to_string());
+        self.indentation_level += 1;
         Box::new(Guard {})
     }
 
     fn debug(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Spinner, &self.allowed_formats) || !self.debug {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
             return;
         }
 
@@ -126,13 +140,13 @@ impl Formatter for Spinner {
             .println(format!("{} {msg}", "[debug]".dimmed()));
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
     }
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
         if !is_allowed(Format::Spinner, &self.allowed_formats) {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
             return "".to_string();
         }
 
@@ -147,14 +161,14 @@ impl Formatter for Spinner {
         });
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
 
         input.trim().to_string()
     }
 
     fn only(&mut self, types: Vec<Format>) -> &mut dyn Formatter {
-        self.allowed_formats = types;
+        self.allowed_formats = types.into_iter().collect();
         self
     }
 

@@ -1,7 +1,7 @@
 use crate::{Displayable, Format, Formatter, IndentGuard};
 use scopeguard::defer;
 use serde_json::json;
-use std::io::Write;
+use std::{collections::HashSet, io::Write};
 
 struct Guard;
 
@@ -16,8 +16,16 @@ impl Drop for Guard {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Json {
     pub debug: bool,
-    indentation: Vec<String>,
-    allowed_formats: Vec<Format>,
+    allowed_formats: HashSet<Format>,
+}
+
+impl Json {
+    pub fn new(debug: bool, max_line_length: usize) -> Json {
+        Json {
+            debug,
+            ..Default::default()
+        }
+    }
 }
 
 impl Formatter for Json {
@@ -27,7 +35,7 @@ impl Formatter for Json {
         }
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
 
         let tmp = json!({
@@ -47,7 +55,7 @@ impl Formatter for Json {
         }
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
 
         let tmp = json!({
@@ -67,7 +75,7 @@ impl Formatter for Json {
         }
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
 
         let tmp = json!({
@@ -87,7 +95,7 @@ impl Formatter for Json {
         }
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
 
         let tmp = json!({
@@ -107,7 +115,7 @@ impl Formatter for Json {
         }
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
 
         let tmp = json!({
@@ -129,7 +137,7 @@ impl Formatter for Json {
         }
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
 
         let tmp = json!({
@@ -144,7 +152,6 @@ impl Formatter for Json {
     }
 
     fn indent(&mut self) -> Box<dyn IndentGuard> {
-        self.indentation.push("  ".to_string());
         Box::new(Guard {})
     }
 
@@ -154,7 +161,7 @@ impl Formatter for Json {
         }
 
         defer! {
-            self.allowed_formats = vec![];
+            self.allowed_formats = HashSet::new();
         }
 
         let tmp = json!({
@@ -177,7 +184,7 @@ impl Formatter for Json {
     }
 
     fn only(&mut self, types: Vec<Format>) -> &mut dyn Formatter {
-        self.allowed_formats = types;
+        self.allowed_formats = types.into_iter().collect();
         self
     }
 

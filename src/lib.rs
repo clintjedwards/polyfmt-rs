@@ -113,7 +113,7 @@ use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     error::Error,
     fmt::{Debug, Display},
     io::Write,
@@ -123,7 +123,7 @@ use std::{
 use strum::EnumString;
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 
-#[derive(Debug, EnumString, Clone, PartialEq, Eq)]
+#[derive(Debug, EnumString, Clone, PartialEq, Eq, Hash)]
 #[strum(ascii_case_insensitive)]
 pub enum Format {
     /// Outputs text in a humanized fashion without any other additions.
@@ -147,10 +147,22 @@ pub enum Format {
 /// Trait for the indentation guard.
 pub trait IndentGuard: Drop {}
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Options {
-    /// Turn on printing for debug lines
+    /// Turn on printing for debug lines.
     pub debug: bool,
+
+    /// Maximum character length for lines including indentation.
+    pub max_line_length: usize,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            debug: Default::default(),
+            max_line_length: 80,
+        }
+    }
 }
 
 /// Meant to represent types that can both be Serialized to JSON and implement the Display trait.
@@ -214,7 +226,7 @@ pub trait Formatter: Debug + Send + Sync {
 static GLOBAL_FORMATTER: Lazy<Mutex<Box<dyn Formatter>>> = Lazy::new(|| {
     let format = Format::Plain;
     let options = Options::default();
-    Mutex::new(new(format, options).unwrap())
+    Mutex::new(new(format, Some(options)).unwrap())
 });
 
 /// Set the global formatter to a custom formatter.
@@ -241,26 +253,27 @@ pub fn get_global_formatter() -> &'static Mutex<Box<dyn Formatter>> {
 /// ```
 pub fn new(
     format: Format,
-    options: Options,
+    options: Option<Options>,
 ) -> Result<Box<dyn Formatter>, Box<dyn Error + Send + Sync>> {
     match format {
         Format::Plain => {
-            let mut formatter = plain::Plain::default();
-            formatter.debug = options.debug;
+            let options = options.unwrap_or_default();
+            let formatter = plain::Plain::new(options.debug, options.max_line_length);
             Ok(Box::new(formatter))
         }
         Format::Spinner => {
-            let mut formatter = spinner::Spinner::default();
-            formatter.debug = options.debug;
+            let options = options.unwrap_or_default();
+            let formatter = spinner::Spinner::new(options.debug, options.max_line_length);
             Ok(Box::new(formatter))
         }
         Format::Tree => {
-            let mut formatter = tree::Tree::default();
-            formatter.debug = options.debug;
+            let options = options.unwrap_or_default();
+            let formatter = tree::Tree::new(options.debug, options.max_line_length);
             Ok(Box::new(formatter))
         }
         Format::Json => {
-            let mut formatter = json::Json::default();
+            let options = options.unwrap_or_default();
+            let mut formatter = json::Json::new(options.debug, options.max_line_length);
             formatter.debug = options.debug;
             Ok(Box::new(formatter))
         }
@@ -272,12 +285,53 @@ pub fn new(
 }
 
 /// Convenience function to determine if format should run based on allowed formats.
-fn is_allowed(current_format: Format, allowed_formats: &Vec<Format>) -> bool {
+fn is_allowed(current_format: Format, allowed_formats: &HashSet<Format>) -> bool {
     if !allowed_formats.contains(&current_format) && !allowed_formats.is_empty() {
         return false;
     }
 
     true
+}
+
+/// Convenience function to chunk lines of text based on the max line length.
+fn format_text_length(
+    msg: &dyn Displayable,
+    indentation_level: u16,
+    max_line_length: usize,
+) -> Vec<String> {
+    let msg = msg.to_string();
+    let indentation_level = usize::from(indentation_level);
+
+    // If the indentation level is already past the max line length we can't print anything.
+    if max_line_length < indentation_level {
+        return vec![];
+    }
+
+    let max_line_width = max_line_length - indentation_level;
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+
+    for word in msg.split_whitespace() {
+        // Check if adding the next word exceeds the max line width
+        if current_line.len() + word.len() + 1 > max_line_width {
+            // Finish the current line and start a new one
+            lines.push(current_line);
+            current_line = String::new();
+        }
+
+        if !current_line.is_empty() {
+            current_line.push(' '); // Add space before the word if it's not the beginning of a line
+        }
+
+        current_line.push_str(word);
+    }
+
+    // Add the last line if it's not empty
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    lines
 }
 
 /// Enables the spinner to automatically clean itself up, when dropped.
@@ -392,14 +446,37 @@ mod tests {
     use std::{str::FromStr, thread, time};
 
     #[test]
+    fn tree() {
+        let options = crate::Options {
+            debug: true,
+            max_line_length: 40,
+        };
+
+        let some_flag = "tree".to_string();
+        let format = crate::Format::from_str(&some_flag).unwrap();
+
+        let mut fmt = crate::new(format, Some(options)).unwrap();
+
+        fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.question(&"Hello from polyfmt, Look at how well it breaks up lines!");
+    }
+
+    #[test]
     fn spinner() {
-        let options = crate::Options { debug: true };
+        let options = crate::Options {
+            debug: true,
+            max_line_length: 80,
+        };
         let ten_millis = time::Duration::from_secs(1);
 
         let some_flag = "spinner".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let mut fmt = crate::new(format, options).unwrap();
+        let mut fmt = crate::new(format, Some(options)).unwrap();
 
         fmt.print(&"Demoing! ");
         thread::sleep(ten_millis);
@@ -421,12 +498,15 @@ mod tests {
 
     #[test]
     fn json() {
-        let options = crate::Options { debug: true };
+        let options = crate::Options {
+            debug: true,
+            max_line_length: 80,
+        };
 
         let some_flag = "json".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let mut fmt = crate::new(format, options).unwrap();
+        let mut fmt = crate::new(format, Some(options)).unwrap();
 
         fmt.print(&"Demoing! ");
         fmt.println(&"Hello from polyfmt");
@@ -438,32 +518,46 @@ mod tests {
 
     #[test]
     fn plain() {
-        let options = crate::Options { debug: true };
+        let options = crate::Options {
+            debug: true,
+            max_line_length: 40,
+        };
 
         let some_flag = "plain".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let mut fmt = crate::new(format, options).unwrap();
+        let mut fmt = crate::new(format, Some(options)).unwrap();
 
-        fmt.print(&"Demoing! ");
-        fmt.println(&"Hello from polyfmt");
-        fmt.success(&"This is a successful message!");
-        fmt.warning(&"This is a warning message");
-        fmt.debug(&"This is a debug message");
-        fmt.error(&"This is an error message");
+        fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
+
+        let _guard = fmt.indent();
+        println!();
+
+        fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
     }
 
     // These tests aren't real tests, I just eyeball things to see if they work.
     // Maybe I'll write real tests, maybe I wont. Shut-up.
     #[test]
     fn global_easy() {
-        let options = crate::Options { debug: true };
+        let options = crate::Options {
+            debug: true,
+            max_line_length: 80,
+        };
         let ten_millis = time::Duration::from_secs(1);
 
         let some_flag = "plain".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let fmt = crate::new(format, options).unwrap();
+        let fmt = crate::new(format, Some(options)).unwrap();
         crate::set_global_formatter(fmt);
 
         print!("Demoing! ");
