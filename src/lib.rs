@@ -154,6 +154,9 @@ pub struct Options {
 
     /// Maximum character length for lines including indentation.
     pub max_line_length: usize,
+
+    /// Amount of spacing between end of window and start of text.
+    pub padding: u16,
 }
 
 impl Default for Options {
@@ -161,6 +164,7 @@ impl Default for Options {
         Self {
             debug: Default::default(),
             max_line_length: 80,
+            padding: 0,
         }
     }
 }
@@ -266,7 +270,8 @@ pub fn new(
         }
         Format::Spinner => {
             let options = options.unwrap_or_default();
-            let formatter = spinner::Spinner::new(options.debug, options.max_line_length);
+            let formatter =
+                spinner::Spinner::new(options.debug, options.max_line_length, options.padding);
             Ok(Box::new(formatter))
         }
         Format::Tree => {
@@ -453,6 +458,7 @@ mod tests {
         let options = crate::Options {
             debug: true,
             max_line_length: 40,
+            padding: 0,
         };
 
         let some_flag = "tree".to_string();
@@ -467,11 +473,12 @@ mod tests {
         fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
 
         let _guard = fmt.indent();
-        println!();
 
         fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        let _guard2 = fmt.indent();
+
         fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
     }
@@ -480,7 +487,8 @@ mod tests {
     fn spinner() {
         let options = crate::Options {
             debug: true,
-            max_line_length: 80,
+            max_line_length: 40,
+            padding: 1,
         };
         let ten_millis = time::Duration::from_secs(1);
 
@@ -489,22 +497,19 @@ mod tests {
 
         let mut fmt = crate::new(format, Some(options)).unwrap();
 
-        fmt.print(&"Demoing! ");
+        fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
         thread::sleep(ten_millis);
 
-        fmt.println(&"Hello from polyfmt");
+        fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
         thread::sleep(ten_millis);
 
-        fmt.success(&"This is a successful message!");
+        fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
         thread::sleep(ten_millis);
 
-        fmt.warning(&"This is a warning message");
+        fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
         thread::sleep(ten_millis);
 
-        fmt.debug(&"This is a debug message");
-        thread::sleep(ten_millis);
-
-        fmt.error(&"This is an error message");
+        fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
     }
 
     #[test]
@@ -512,6 +517,7 @@ mod tests {
         let options = crate::Options {
             debug: true,
             max_line_length: 80,
+            padding: 0,
         };
 
         let some_flag = "json".to_string();
@@ -532,6 +538,7 @@ mod tests {
         let options = crate::Options {
             debug: true,
             max_line_length: 40,
+            padding: 0,
         };
 
         let some_flag = "plain".to_string();
@@ -553,6 +560,7 @@ mod tests {
         let options = crate::Options {
             debug: true,
             max_line_length: 80,
+            padding: 1,
         };
         let ten_millis = time::Duration::from_secs(1);
 

@@ -8,10 +8,11 @@ use std::sync::{Arc, Mutex, Weak};
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Tree {
     debug: bool,
-    header_printed: bool,
     indentation_level: u16,
     max_line_length: usize,
     allowed_formats: HashSet<Format>,
+
+    header_printed: bool,
 }
 
 impl Tree {
@@ -29,9 +30,9 @@ struct Guard {
 }
 
 impl Guard {
-    pub fn new(tree: &Arc<Mutex<Tree>>) -> Guard {
-        Guard {
-            tree: Arc::downgrade(tree),
+    fn new(tree: Arc<Mutex<Tree>>) -> Self {
+        Self {
+            tree: Arc::downgrade(&tree),
         }
     }
 }
@@ -41,17 +42,15 @@ impl IndentGuard for Guard {}
 impl Drop for Guard {
     fn drop(&mut self) {
         if let Some(tree) = self.tree.upgrade() {
-            let mut tree = tree.lock().unwrap();
-            tree.outdent();
+            let mut tree_lock = tree.lock().unwrap();
+            tree_lock.outdent();
         }
     }
 }
 
-impl Formatter for Arc<Mutex<Tree>> {
+impl Tree {
     fn print(&mut self, msg: &dyn Displayable) {
-        let fmt = self.lock().unwrap();
-
-        if !is_allowed(Format::Tree, &fmt.allowed_formats) {
+        if !is_allowed(Format::Tree, &self.allowed_formats) {
             self.allowed_formats = HashSet::new();
             return;
         }
@@ -89,6 +88,7 @@ impl Formatter for Arc<Mutex<Tree>> {
                 format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
                 lines.first().unwrap(),
             );
+            self.header_printed = true;
         }
 
         // Print the remaining lines
@@ -246,10 +246,13 @@ impl Formatter for Arc<Mutex<Tree>> {
         }
     }
 
-    fn indent(&mut self) -> Box<dyn IndentGuard> {
-        let mut tree = self.lock().unwrap();
-        tree.indentation_level += 1;
-        Guard::new(tree)
+    fn indent(tree: &Arc<Mutex<Self>>) -> Box<dyn IndentGuard> {
+        let mut fmt = tree.lock().unwrap();
+        fmt.indentation_level += 1;
+        drop(fmt);
+        let cloned_tree = Arc::clone(tree);
+        let guard = Guard::new(cloned_tree);
+        Box::new(guard)
     }
 
     fn outdent(&mut self) {
@@ -297,12 +300,70 @@ impl Formatter for Arc<Mutex<Tree>> {
         input.trim().to_string()
     }
 
-    fn only(&mut self, types: Vec<Format>) -> &mut dyn Formatter {
+    fn only(&mut self, types: Vec<Format>) -> &mut Self {
         self.allowed_formats = types.into_iter().collect();
         self
     }
 
     fn finish(&self) {
         std::io::stdout().flush().unwrap();
+    }
+}
+
+impl Formatter for Arc<Mutex<Tree>> {
+    fn print(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.print(msg);
+    }
+
+    fn println(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.println(msg);
+    }
+
+    fn error(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.error(msg);
+    }
+
+    fn success(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.success(msg);
+    }
+
+    fn warning(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.warning(msg);
+    }
+
+    fn debug(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.debug(msg);
+    }
+
+    fn indent(&mut self) -> Box<dyn IndentGuard> {
+        Tree::indent(self)
+    }
+
+    fn outdent(&mut self) {
+        let mut fmt = self.lock().unwrap();
+        fmt.outdent();
+    }
+
+    fn question(&mut self, msg: &dyn Displayable) -> String {
+        let mut fmt = self.lock().unwrap();
+        fmt.question(msg)
+    }
+
+    fn only(&mut self, types: Vec<Format>) -> &mut dyn Formatter {
+        let mut fmt = self.lock().unwrap();
+        fmt.only(types);
+        drop(fmt);
+        self
+    }
+
+    fn finish(&self) {
+        let fmt = self.lock().unwrap();
+        fmt.finish();
     }
 }

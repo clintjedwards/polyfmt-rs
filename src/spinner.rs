@@ -1,37 +1,54 @@
-use crate::{is_allowed, Displayable, Format, Formatter, IndentGuard};
+use crate::{format_text_length, is_allowed, Displayable, Format, Formatter, IndentGuard};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use scopeguard::defer;
+use std::sync::{Arc, Mutex, Weak};
 use std::{collections::HashSet, io::Write, time::Duration};
 
 #[derive(Debug, Clone)]
 pub struct Spinner {
     debug: bool,
-    allowed_formats: HashSet<Format>,
-    max_line_length: usize,
     indentation_level: u16,
+    max_line_length: usize,
+    allowed_formats: HashSet<Format>,
+
     spinner: ProgressBar,
 }
 
 impl Spinner {
-    pub fn new(debug: bool, max_line_length: usize) -> Spinner {
+    pub fn new(debug: bool, max_line_length: usize, padding: u16) -> Arc<Mutex<Self>> {
         let spinner = new_spinner();
 
-        Spinner {
+        Arc::new(Mutex::new(Spinner {
             debug,
             max_line_length,
+            indentation_level: padding,
+            spinner,
             ..Default::default()
-        }
+        }))
     }
 }
 
-struct Guard;
+struct Guard {
+    spinner: Weak<Mutex<Spinner>>,
+}
+
+impl Guard {
+    fn new(spinner: Arc<Mutex<Spinner>>) -> Self {
+        Self {
+            spinner: Arc::downgrade(&spinner),
+        }
+    }
+}
 
 impl IndentGuard for Guard {}
 
 impl Drop for Guard {
     fn drop(&mut self) {
-        todo!()
+        if let Some(spinner) = self.spinner.upgrade() {
+            let mut spinner_lock = spinner.lock().unwrap();
+            spinner_lock.outdent();
+        }
     }
 }
 
@@ -59,7 +76,7 @@ fn new_spinner() -> ProgressBar {
     spinner
 }
 
-impl Formatter for Spinner {
+impl Spinner {
     fn print(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Spinner, &self.allowed_formats) {
             self.allowed_formats = HashSet::new();
@@ -79,7 +96,22 @@ impl Formatter for Spinner {
             return;
         }
 
-        self.spinner.println(format!("{msg}"));
+        let lines = format_text_length(msg, self.indentation_level, self.max_line_length);
+
+        if lines.is_empty() {
+            return;
+        }
+
+        self.spinner
+            .println(" ".repeat(self.indentation_level.into()) + lines.first().unwrap());
+
+        for line in lines.iter().skip(1) {
+            self.spinner.println(format!(
+                "{}{}",
+                " ".repeat(self.indentation_level.into()),
+                line
+            ));
+        }
 
         defer! {
             self.allowed_formats = HashSet::new();
@@ -92,7 +124,26 @@ impl Formatter for Spinner {
             return;
         }
 
-        self.spinner.println(format!("{} {msg}", "x".red()));
+        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+
+        if lines.is_empty() {
+            return;
+        }
+
+        self.spinner.println(format!(
+            "{}{} {}",
+            " ".repeat(self.indentation_level.into()),
+            "x".red(),
+            lines.first().unwrap()
+        ));
+
+        for line in lines.iter().skip(1) {
+            self.spinner.println(format!(
+                "{}{}",
+                " ".repeat((self.indentation_level + 2).into()),
+                line
+            ));
+        }
 
         defer! {
             self.allowed_formats = HashSet::new();
@@ -105,7 +156,26 @@ impl Formatter for Spinner {
             return;
         }
 
-        self.spinner.println(format!("{} {msg}", "✓".green()));
+        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+
+        if lines.is_empty() {
+            return;
+        }
+
+        self.spinner.println(format!(
+            "{}{} {}",
+            " ".repeat(self.indentation_level.into()),
+            "✓".green(),
+            lines.first().unwrap()
+        ));
+
+        for line in lines.iter().skip(1) {
+            self.spinner.println(format!(
+                "{}{}",
+                " ".repeat((self.indentation_level + 2).into()),
+                line
+            ));
+        }
 
         defer! {
             self.allowed_formats = HashSet::new();
@@ -118,16 +188,39 @@ impl Formatter for Spinner {
             return;
         }
 
-        self.spinner.println(format!("{} {msg}", "!!".yellow()));
+        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+
+        if lines.is_empty() {
+            return;
+        }
+
+        self.spinner.println(format!(
+            "{}{} {}",
+            " ".repeat(self.indentation_level.into()),
+            "!!".yellow(),
+            lines.first().unwrap()
+        ));
+
+        for line in lines.iter().skip(1) {
+            self.spinner.println(format!(
+                "{}{}",
+                " ".repeat((self.indentation_level + 3).into()),
+                line
+            ));
+        }
 
         defer! {
             self.allowed_formats = HashSet::new();
         }
     }
 
-    fn indent(&mut self) -> Box<dyn IndentGuard> {
-        self.indentation_level += 1;
-        Box::new(Guard {})
+    fn indent(spinner: &Arc<Mutex<Self>>) -> Box<dyn IndentGuard> {
+        let mut fmt = spinner.lock().unwrap();
+        fmt.indentation_level += 1;
+        drop(fmt);
+        let cloned_spinner = Arc::clone(spinner);
+        let guard = Guard::new(cloned_spinner);
+        Box::new(guard)
     }
 
     fn outdent(&mut self) {
@@ -142,8 +235,26 @@ impl Formatter for Spinner {
             return;
         }
 
-        self.spinner
-            .println(format!("{} {msg}", "[debug]".dimmed()));
+        let lines = format_text_length(msg, self.indentation_level + 8, self.max_line_length);
+
+        if lines.is_empty() {
+            return;
+        }
+
+        self.spinner.println(format!(
+            "{}{} {}",
+            " ".repeat(self.indentation_level.into()),
+            "[debug]".dimmed(),
+            lines.first().unwrap()
+        ));
+
+        for line in lines.iter().skip(1) {
+            self.spinner.println(format!(
+                "{}{}",
+                " ".repeat((self.indentation_level + 8).into()),
+                line
+            ));
+        }
 
         defer! {
             self.allowed_formats = HashSet::new();
@@ -156,10 +267,25 @@ impl Formatter for Spinner {
             return "".to_string();
         }
 
+        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+
         let mut input = String::from("");
 
         self.spinner.suspend(|| {
-            print!("{} {msg}", "?".magenta());
+            self.spinner.println(format!(
+                "{}{} {}",
+                " ".repeat(self.indentation_level.into()),
+                "?".magenta(),
+                lines.first().unwrap()
+            ));
+
+            for line in lines.iter().skip(1) {
+                self.spinner.println(format!(
+                    "{}{}",
+                    " ".repeat((self.indentation_level + 2).into()),
+                    line
+                ));
+            }
 
             std::io::stdout().flush().unwrap();
 
@@ -173,12 +299,70 @@ impl Formatter for Spinner {
         input.trim().to_string()
     }
 
-    fn only(&mut self, types: Vec<Format>) -> &mut dyn Formatter {
+    fn only(&mut self, types: Vec<Format>) -> &mut Self {
         self.allowed_formats = types.into_iter().collect();
         self
     }
 
     fn finish(&self) {
         self.spinner.finish_and_clear();
+    }
+}
+
+impl Formatter for Arc<Mutex<Spinner>> {
+    fn print(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.print(msg);
+    }
+
+    fn println(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.println(msg);
+    }
+
+    fn error(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.error(msg);
+    }
+
+    fn success(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.success(msg);
+    }
+
+    fn warning(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.warning(msg);
+    }
+
+    fn debug(&mut self, msg: &dyn Displayable) {
+        let mut fmt = self.lock().unwrap();
+        fmt.debug(msg);
+    }
+
+    fn indent(&mut self) -> Box<dyn IndentGuard> {
+        Spinner::indent(self)
+    }
+
+    fn outdent(&mut self) {
+        let mut fmt = self.lock().unwrap();
+        fmt.outdent();
+    }
+
+    fn question(&mut self, msg: &dyn Displayable) -> String {
+        let mut fmt = self.lock().unwrap();
+        fmt.question(msg)
+    }
+
+    fn only(&mut self, types: Vec<Format>) -> &mut dyn Formatter {
+        let mut fmt = self.lock().unwrap();
+        fmt.only(types);
+        drop(fmt);
+        self
+    }
+
+    fn finish(&self) {
+        let fmt = self.lock().unwrap();
+        fmt.finish();
     }
 }

@@ -58,14 +58,14 @@ impl Formatter for Plain {
         }
 
         println!(
-            " {}{}",
+            "  {}{}",
             " ".repeat(self.indentation_level.into()),
             lines.first().unwrap(),
         );
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!("{} {}", " ".repeat(self.indentation_level.into()), line);
+            println!("{}{}", " ".repeat(self.indentation_level.into()), line);
         }
 
         defer! {
@@ -86,7 +86,7 @@ impl Formatter for Plain {
         }
 
         println!(
-            " {}{} {}",
+            "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "x".red(),
             lines.first().unwrap(),
@@ -94,7 +94,11 @@ impl Formatter for Plain {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!("{}   {}", " ".repeat(self.indentation_level.into()), line);
+            println!(
+                "{}{}",
+                " ".repeat((self.indentation_level + 2).into()),
+                line
+            );
         }
 
         defer! {
@@ -115,7 +119,7 @@ impl Formatter for Plain {
         }
 
         println!(
-            " {}{} {}",
+            "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "✓".green(),
             lines.first().unwrap(),
@@ -123,7 +127,11 @@ impl Formatter for Plain {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!("{}   {}", " ".repeat(self.indentation_level.into()), line);
+            println!(
+                "{}{}",
+                " ".repeat((self.indentation_level + 2).into()),
+                line
+            );
         }
 
         defer! {
@@ -144,7 +152,7 @@ impl Formatter for Plain {
         }
 
         println!(
-            " {}{} {}",
+            "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "!!".yellow(),
             lines.first().unwrap(),
@@ -152,7 +160,11 @@ impl Formatter for Plain {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!("{}   {}", " ".repeat(self.indentation_level.into()), line);
+            println!(
+                " {}{}",
+                " ".repeat((self.indentation_level + 2).into()),
+                line
+            );
         }
 
         defer! {
@@ -173,7 +185,7 @@ impl Formatter for Plain {
         }
 
         println!(
-            " {}{} {}",
+            "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "[debug]".dimmed(),
             lines.first().unwrap(),
@@ -181,7 +193,11 @@ impl Formatter for Plain {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!("{}   {}", " ".repeat(self.indentation_level.into()), line);
+            println!(
+                "{} {}",
+                " ".repeat((self.indentation_level + 7).into()),
+                line
+            );
         }
 
         defer! {
@@ -209,7 +225,7 @@ impl Formatter for Plain {
         let lines = format_text_length(msg, self.indentation_level + 8, self.max_line_length);
 
         println!(
-            " {}{} {}",
+            "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "?".magenta(),
             lines.first().unwrap(),
@@ -217,7 +233,11 @@ impl Formatter for Plain {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!("{}   {}", " ".repeat(self.indentation_level.into()), line);
+            println!(
+                "{}   {}",
+                " ".repeat((self.indentation_level + 8).into()),
+                line
+            );
         }
 
         defer! {
