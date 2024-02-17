@@ -85,6 +85,15 @@ macro_rules! error {
     }};
 }
 
+#[macro_export]
+macro_rules! indent {
+    () => {{
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.indent()
+    }};
+}
+
 /// Print an warning message with an exclamation mark.
 ///
 /// # Examples

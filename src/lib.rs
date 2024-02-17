@@ -454,7 +454,7 @@ fn display_choices(choices: &[&String], selected: usize) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{debug, error, println, question, success, warning};
+    use crate::{debug, error, indent, println, success, warning};
     use std::{str::FromStr, thread, time};
 
     #[test]
@@ -560,19 +560,18 @@ mod tests {
             padding: 1,
         };
 
-        let some_flag = "plain".to_string();
+        let some_flag = "tree".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let mut fmt = crate::new(format, Some(options)).unwrap();
-        fmt.question(&"Hello from polyfmt, Look at how well it breaks up lines: ");
+        let fmt = crate::new(format, Some(options)).unwrap();
         crate::set_global_formatter(fmt);
 
         println!("Hello from polyfmt, Look at how well it breaks up lines!");
         success!("Hello from polyfmt, Look at how well it breaks up lines!");
+        let _guard = indent!();
         error!("Hello from polyfmt, Look at how well it breaks up lines!");
         debug!("Hello from polyfmt, Look at how well it breaks up lines!");
         warning!("Hello from polyfmt, Look at how well it breaks up lines!");
         println!("testing things to other things");
-        question!("Hello from polyfmt, Look at how well it breaks up lines:");
     }
 }
