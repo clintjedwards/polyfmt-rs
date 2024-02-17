@@ -20,7 +20,7 @@ pub struct Json {
 }
 
 impl Json {
-    pub fn new(debug: bool, max_line_length: usize) -> Json {
+    pub fn new(debug: bool) -> Json {
         Json {
             debug,
             ..Default::default()

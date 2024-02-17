@@ -145,7 +145,7 @@ pub enum Format {
 }
 
 /// Trait for the indentation guard.
-pub trait IndentGuard: Drop {}
+pub trait IndentGuard {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Options {
@@ -281,8 +281,7 @@ pub fn new(
         }
         Format::Json => {
             let options = options.unwrap_or_default();
-            let mut formatter = json::Json::new(options.debug, options.max_line_length);
-            formatter.debug = options.debug;
+            let formatter = json::Json::new(options.debug);
             Ok(Box::new(formatter))
         }
         Format::Silent => {
@@ -455,6 +454,8 @@ mod tests {
 
     #[test]
     fn tree() {
+        let _ = question!("");
+
         let options = crate::Options {
             debug: true,
             max_line_length: 40,

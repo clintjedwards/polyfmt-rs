@@ -5,9 +5,7 @@ struct Guard;
 impl IndentGuard for Guard {}
 
 impl Drop for Guard {
-    fn drop(&mut self) {
-        todo!()
-    }
+    fn drop(&mut self) {}
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
