@@ -333,6 +333,11 @@ fn format_text_length(
         current_line.push_str(word);
     }
 
+    // If the last character is whitespace add it back.
+    if msg.split_whitespace().last().unwrap_or_default() == " " {
+        current_line.push(' ');
+    }
+
     // Add the last line if it's not empty
     if !current_line.is_empty() {
         lines.push(current_line);
@@ -449,7 +454,7 @@ fn display_choices(choices: &[&String], selected: usize) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{debug, error, println, success, warning};
+    use crate::{debug, error, println, question, success, warning};
     use std::{str::FromStr, thread, time};
 
     #[test]
@@ -467,17 +472,10 @@ mod tests {
 
         fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
 
         let _guard = fmt.indent();
 
-        fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        let _guard2 = fmt.indent();
-
         fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
     }
@@ -558,32 +556,23 @@ mod tests {
     fn global_easy() {
         let options = crate::Options {
             debug: true,
-            max_line_length: 40,
+            max_line_length: 100,
             padding: 1,
         };
-        use crate::Format;
 
         let some_flag = "plain".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let fmt = crate::new(format, Some(options)).unwrap();
+        let mut fmt = crate::new(format, Some(options)).unwrap();
+        fmt.question(&"Hello from polyfmt, Look at how well it breaks up lines: ");
         crate::set_global_formatter(fmt);
 
-        let name = "Clint";
-        let test = "Win";
-        let one = "one";
-
         println!("Hello from polyfmt, Look at how well it breaks up lines!");
-        println!(
-            "Hello from polyfmt, Look at how well it breaks up lines! Hello {}",
-            name
-        );
-        println!("Hello from polyfmt, Look at how well it breaks up lines! Hello {name} - {one}"; vec![Format::Json]);
-        println!(
-            "Hello from polyfmt, Look at how well it breaks up lines! {}={} {}",
-            name,
-            test, one;
-            vec![Format::Plain]
-        );
+        success!("Hello from polyfmt, Look at how well it breaks up lines!");
+        error!("Hello from polyfmt, Look at how well it breaks up lines!");
+        debug!("Hello from polyfmt, Look at how well it breaks up lines!");
+        warning!("Hello from polyfmt, Look at how well it breaks up lines!");
+        println!("testing things to other things");
+        question!("Hello from polyfmt, Look at how well it breaks up lines:");
     }
 }

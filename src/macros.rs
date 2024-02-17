@@ -1,28 +1,25 @@
-/// Print a success message with a check-mark.
+/// Print a normal message.
 ///
 /// # Examples
 ///
 /// ```
 /// let name = "Clint";
-/// success!("Hello, {name}");
-/// success!("Hello Clint");
-/// success!("Hello, {}", name);
+/// println!("Hello, {name}");
+/// println!("Hello Clint");
+/// println!("Hello, {}", name);
+/// println!("Hello, {}", name; vec![Format::Plain])
 /// ```
 #[macro_export]
 macro_rules! println {
+    // Allows a simple format style string, with some arguments or none.
     ($s:expr $(, $arg:expr),*) => ({
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
         fmt.println(&format!("{}", format_args!($s, $($arg),*)));
     });
 
-    ($s:expr, $($arg:expr),*) => ({
-        let global_fmtter = $crate::get_global_formatter();
-        let mut fmt = global_fmtter.lock().unwrap();
-        fmt.println(&format!("{}", format_args!($s, $($arg),*)));
-    });
-
-    // Variant with format specification, expecting a tuple as the last argument
+    // Allows a simple format style string with some arguments or none and also
+    // accounts for if the user wants to insert a formatter filter.
     ($s:expr $(, $args:expr)* ; $formats:expr) => {{
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
@@ -39,20 +36,24 @@ macro_rules! println {
 /// success!("Hello, {name}");
 /// success!("Hello Clint");
 /// success!("Hello, {}", name);
+/// success!("Hello, {}", name; vec![Format::Plain])
 /// ```
 #[macro_export]
 macro_rules! success {
+    // Allows a simple format style string, with some arguments or none.
     ($s:expr $(, $arg:expr),*) => ({
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
         fmt.success(&format!("{}", format_args!($s, $($arg),*)));
     });
 
-    ($s:expr, $($arg:expr),*) => ({
+    // Allows a simple format style string with some arguments or none and also
+    // accounts for if the user wants to insert a formatter filter.
+    ($s:expr $(, $args:expr)* ; $formats:expr) => {{
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
-        fmt.success(&format!("{}", format_args!($s, $($arg),*)));
-    });
+        fmt.only($formats).success(&format!("{}", format_args!($s, $($args),*)));
+    }};
 }
 
 /// Print an error message with a red x.
@@ -61,23 +62,27 @@ macro_rules! success {
 ///
 /// ```
 /// let name = "Clint";
-/// err!("Hello, {name}");
-/// err!("Hello Clint");
-/// err!("Hello, {}", name);
+/// error!("Hello, {name}");
+/// error!("Hello Clint");
+/// error!("Hello, {}", name);
+/// error!("Hello, {}", name; vec![Format::Plain])
 /// ```
 #[macro_export]
 macro_rules! error {
+    // Allows a simple format style string, with some arguments or none.
     ($s:expr $(, $arg:expr),*) => ({
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
         fmt.error(&format!("{}", format_args!($s, $($arg),*)));
     });
 
-    ($s:expr, $($arg:expr),*) => ({
+    // Allows a simple format style string with some arguments or none and also
+    // accounts for if the user wants to insert a formatter filter.
+    ($s:expr $(, $args:expr)* ; $formats:expr) => {{
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
-        fmt.error(&format!("{}", format_args!($s, $($arg),*)));
-    });
+        fmt.only($formats).error(&format!("{}", format_args!($s, $($args),*)));
+    }};
 }
 
 /// Print an warning message with an exclamation mark.
@@ -89,20 +94,24 @@ macro_rules! error {
 /// warning!("Hello, {name}");
 /// warning!("Hello Clint");
 /// warning!("Hello, {}", name);
+/// warning!("Hello, {}", name; vec![Format::Plain])
 /// ```
 #[macro_export]
 macro_rules! warning {
+    // Allows a simple format style string, with some arguments or none.
     ($s:expr $(, $arg:expr),*) => ({
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
         fmt.warning(&format!("{}", format_args!($s, $($arg),*)));
     });
 
-    ($s:expr, $($arg:expr),*) => ({
+    // Allows a simple format style string with some arguments or none and also
+    // accounts for if the user wants to insert a formatter filter.
+    ($s:expr $(, $args:expr)* ; $formats:expr) => {{
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
-        fmt.warning(&format!("{}", format_args!($s, $($arg),*)));
-    });
+        fmt.only($formats).warning(&format!("{}", format_args!($s, $($args),*)));
+    }};
 }
 
 /// Print a question which waits for user input.
@@ -113,34 +122,52 @@ macro_rules! warning {
 /// let name = "Clint";
 /// question!("Hello, {name}");
 /// question!("Hello Clint");
+/// question!("Hello, {}", name; vec![Format::Plain])
 /// let input = question!("Hello, {}", name);
 /// ```
 #[macro_export]
 macro_rules! question {
+    // Allows a simple format style string, with some arguments or none.
     ($s:expr $(, $arg:expr),*) => ({
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
-        fmt.question(&format!("{}", format_args!($s, $($arg),*)))
+        fmt.question(&format!("{}", format_args!($s, $($arg),*)));
     });
 
-    ($s:expr, $($arg:expr),*) => ({
+    // Allows a simple format style string with some arguments or none and also
+    // accounts for if the user wants to insert a formatter filter.
+    ($s:expr $(, $args:expr)* ; $formats:expr) => {{
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
-        fmt.question(&format!("{}", format_args!($s, $($arg),*)))
-    });
+        fmt.only($formats).question(&format!("{}", format_args!($s, $($args),*)));
+    }};
 }
 
+/// Print a debug message that only shows up if debug mode is on.
+///
+/// # Examples
+///
+/// ```
+/// let name = "Clint";
+/// debug!("Hello, {name}");
+/// debug!("Hello Clint");
+/// debug!("Hello, {}", name);
+/// debug!("Hello, {}", name; vec![Format::Plain])
+/// ```
 #[macro_export]
 macro_rules! debug {
+    // Allows a simple format style string, with some arguments or none.
     ($s:expr $(, $arg:expr),*) => ({
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
         fmt.debug(&format!("{}", format_args!($s, $($arg),*)));
     });
 
-    ($s:expr, $($arg:expr),*) => ({
+    // Allows a simple format style string with some arguments or none and also
+    // accounts for if the user wants to insert a formatter filter.
+    ($s:expr $(, $args:expr)* ; $formats:expr) => {{
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
-        fmt.debug(&format!("{}", format_args!($s, $($arg),*)));
-    });
+        fmt.only($formats).debug(&format!("{}", format_args!($s, $($args),*)));
+    }};
 }

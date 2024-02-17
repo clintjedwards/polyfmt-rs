@@ -240,22 +240,42 @@ impl Plain {
             return "".to_string();
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 8, self.max_line_length);
+        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
 
-        println!(
-            "{}{} {}",
-            " ".repeat(self.indentation_level.into()),
-            "?".magenta(),
-            lines.first().unwrap_or(&"".to_string()),
-        );
-
-        // Print the remaining lines
-        for line in lines.iter().skip(1) {
-            println!(
-                "{}   {}",
-                " ".repeat((self.indentation_level + 8).into()),
-                line
+        if lines.len() == 1 {
+            print!(
+                "{}{} {} ",
+                " ".repeat(self.indentation_level.into()),
+                "?".magenta(),
+                lines.first().unwrap_or(&"".to_string()),
             );
+        } else {
+            println!(
+                "{}{} {}",
+                " ".repeat(self.indentation_level.into()),
+                "?".magenta(),
+                lines.first().unwrap_or(&"".to_string()),
+            );
+
+            // Print the remaining lines except the last with println!
+            let lines_count = lines.len();
+            for (index, line) in lines.iter().enumerate().skip(1) {
+                if index + 1 < lines_count {
+                    // Not the last line
+                    println!(
+                        "{}{}",
+                        " ".repeat((self.indentation_level + 2).into()),
+                        line
+                    );
+                } else {
+                    // Last line, use print! instead
+                    print!(
+                        "{}{} ",
+                        " ".repeat((self.indentation_level + 2).into()),
+                        line
+                    );
+                }
+            }
         }
 
         defer! {
