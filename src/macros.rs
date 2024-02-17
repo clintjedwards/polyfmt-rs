@@ -9,6 +9,38 @@
 /// success!("Hello, {}", name);
 /// ```
 #[macro_export]
+macro_rules! println {
+    ($s:expr $(, $arg:expr),*) => ({
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.println(&format!("{}", format_args!($s, $($arg),*)));
+    });
+
+    ($s:expr, $($arg:expr),*) => ({
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.println(&format!("{}", format_args!($s, $($arg),*)));
+    });
+
+    // Variant with format specification, expecting a tuple as the last argument
+    ($s:expr $(, $args:expr)* ; $formats:expr) => {{
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.only($formats).println(&format!("{}", format_args!($s, $($args),*)));
+    }};
+}
+
+/// Print a success message with a check-mark.
+///
+/// # Examples
+///
+/// ```
+/// let name = "Clint";
+/// success!("Hello, {name}");
+/// success!("Hello Clint");
+/// success!("Hello, {}", name);
+/// ```
+#[macro_export]
 macro_rules! success {
     ($s:expr $(, $arg:expr),*) => ({
         let global_fmtter = $crate::get_global_formatter();

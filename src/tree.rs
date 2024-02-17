@@ -79,14 +79,14 @@ impl Tree {
                 "{}{} {}",
                 "├─".magenta(),
                 format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
-                lines.first().unwrap(),
+                lines.first().unwrap_or(&"".to_string()),
             );
         } else {
             println!(
                 "{}{} {}",
                 "┌─".magenta(),
                 format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
-                lines.first().unwrap(),
+                lines.first().unwrap_or(&"".to_string()),
             );
             self.header_printed = true;
         }
@@ -123,7 +123,7 @@ impl Tree {
             "├─".magenta(),
             format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
             "x".red(),
-            lines.first().unwrap()
+            lines.first().unwrap_or(&"".to_string())
         );
 
         // Print the remaining lines
@@ -158,7 +158,7 @@ impl Tree {
             "├─".magenta(),
             format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
             "✓".green(),
-            lines.first().unwrap()
+            lines.first().unwrap_or(&"".to_string())
         );
 
         // Print the remaining lines
@@ -193,7 +193,7 @@ impl Tree {
             "├─".magenta(),
             format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
             "!!".yellow(),
-            lines.first().unwrap()
+            lines.first().unwrap_or(&"".to_string())
         );
 
         // Print the remaining lines
@@ -228,7 +228,7 @@ impl Tree {
             "├─".magenta(),
             format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
             "[debug]".dimmed(),
-            lines.first().unwrap()
+            lines.first().unwrap_or(&"".to_string())
         );
 
         // Print the remaining lines
@@ -274,7 +274,7 @@ impl Tree {
             "├─".magenta(),
             format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
             "?".magenta(),
-            lines.first().unwrap()
+            lines.first().unwrap_or(&"".to_string())
         );
 
         // Print the remaining lines

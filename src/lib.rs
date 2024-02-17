@@ -449,13 +449,11 @@ fn display_choices(choices: &[&String], selected: usize) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{debug, error, question, success, warning};
+    use crate::{debug, error, println, success, warning};
     use std::{str::FromStr, thread, time};
 
     #[test]
     fn tree() {
-        let _ = question!("");
-
         let options = crate::Options {
             debug: true,
             max_line_length: 40,
@@ -560,10 +558,10 @@ mod tests {
     fn global_easy() {
         let options = crate::Options {
             debug: true,
-            max_line_length: 80,
+            max_line_length: 40,
             padding: 1,
         };
-        let ten_millis = time::Duration::from_secs(1);
+        use crate::Format;
 
         let some_flag = "plain".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
@@ -571,16 +569,21 @@ mod tests {
         let fmt = crate::new(format, Some(options)).unwrap();
         crate::set_global_formatter(fmt);
 
-        print!("Demoing! ");
+        let name = "Clint";
+        let test = "Win";
+        let one = "one";
 
-        println!("Hello from polyfmt");
-
-        thread::sleep(ten_millis);
-        success!("{}", "This is a successful message!");
-        thread::sleep(ten_millis);
-        warning!("This is a warning message");
-        thread::sleep(ten_millis);
-        debug!("This is a debug message");
-        error!("This is an error message");
+        println!("Hello from polyfmt, Look at how well it breaks up lines!");
+        println!(
+            "Hello from polyfmt, Look at how well it breaks up lines! Hello {}",
+            name
+        );
+        println!("Hello from polyfmt, Look at how well it breaks up lines! Hello {name} - {one}"; vec![Format::Json]);
+        println!(
+            "Hello from polyfmt, Look at how well it breaks up lines! {}={} {}",
+            name,
+            test, one;
+            vec![Format::Plain]
+        );
     }
 }

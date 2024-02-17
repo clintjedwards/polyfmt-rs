@@ -102,8 +102,9 @@ impl Spinner {
             return;
         }
 
-        self.spinner
-            .println(" ".repeat(self.indentation_level.into()) + lines.first().unwrap());
+        self.spinner.println(
+            " ".repeat(self.indentation_level.into()) + lines.first().unwrap_or(&"".to_string()),
+        );
 
         for line in lines.iter().skip(1) {
             self.spinner.println(format!(
@@ -134,7 +135,7 @@ impl Spinner {
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "x".red(),
-            lines.first().unwrap()
+            lines.first().unwrap_or(&"".to_string())
         ));
 
         for line in lines.iter().skip(1) {
@@ -166,7 +167,7 @@ impl Spinner {
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "✓".green(),
-            lines.first().unwrap()
+            lines.first().unwrap_or(&"".to_string())
         ));
 
         for line in lines.iter().skip(1) {
@@ -198,7 +199,7 @@ impl Spinner {
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "!!".yellow(),
-            lines.first().unwrap()
+            lines.first().unwrap_or(&"".to_string())
         ));
 
         for line in lines.iter().skip(1) {
@@ -245,7 +246,7 @@ impl Spinner {
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "[debug]".dimmed(),
-            lines.first().unwrap()
+            lines.first().unwrap_or(&"".to_string())
         ));
 
         for line in lines.iter().skip(1) {
@@ -276,7 +277,7 @@ impl Spinner {
                 "{}{} {}",
                 " ".repeat(self.indentation_level.into()),
                 "?".magenta(),
-                lines.first().unwrap()
+                lines.first().unwrap_or(&"".to_string())
             ));
 
             for line in lines.iter().skip(1) {
