@@ -205,7 +205,7 @@ macro_rules! question {
     ($s:expr $(, $arg:expr),*) => ({
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
-        fmt.question(&format!("{}", format_args!($s, $($arg),*)));
+        fmt.question(&format!("{}", format_args!($s, $($arg),*)))
     });
 
     // Allows a simple format style string with some arguments or none and also
@@ -213,7 +213,7 @@ macro_rules! question {
     ($s:expr $(, $args:expr)* ; $formats:expr) => {{
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
-        fmt.only($formats).question(&format!("{}", format_args!($s, $($args),*)));
+        fmt.only($formats).question(&format!("{}", format_args!($s, $($args),*)))
     }};
 }
 
