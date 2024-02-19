@@ -565,7 +565,7 @@ mod tests {
     #[test]
     #[ignore]
     fn global_easy() {
-        use crate::question;
+        use crate::{println, question};
         // let options = crate::Options {
         //     debug: true,
         //     max_line_length: 100,
@@ -587,5 +587,17 @@ mod tests {
         println!("testing things to other things");
         let my_question = question!("Testing out questions: ");
         println!("{}", my_question);
+
+        struct Customer {
+            id: String,
+            name: String,
+        }
+
+        let customer = Customer {
+            id: "id".to_string(),
+            name: "name".to_string(),
+        };
+
+        error!("Created customer [{}] {}", customer.id, customer.name);
     }
 }
