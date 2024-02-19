@@ -261,6 +261,10 @@ impl Tree {
         }
     }
 
+    fn spacer(&mut self) {
+        println!("{}", "┊".magenta(),);
+    }
+
     fn question(&mut self, msg: &dyn Displayable) -> String {
         if !is_allowed(Format::Tree, &self.allowed_formats) {
             self.allowed_formats = HashSet::new();
@@ -348,6 +352,11 @@ impl Formatter for Arc<Mutex<Tree>> {
     fn outdent(&mut self) {
         let mut fmt = self.lock().unwrap();
         fmt.outdent();
+    }
+
+    fn spacer(&mut self) {
+        let mut fmt = self.lock().unwrap();
+        fmt.spacer();
     }
 
     fn question(&mut self, msg: &dyn Displayable) -> String {

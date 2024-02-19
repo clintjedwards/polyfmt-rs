@@ -213,6 +213,9 @@ pub trait Formatter: Debug + Send + Sync {
     /// Decreases the indentation of output.
     fn outdent(&mut self);
 
+    /// Prints a spacer where the type of spacer is determined by the [`Formatter`]
+    fn spacer(&mut self);
+
     /// Prints the message noting it as a question to the user.
     /// It additionally also collects user input and returns it.
     ///
@@ -474,6 +477,7 @@ mod tests {
         fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
 
         let _guard = fmt.indent();
+        fmt.spacer();
 
         fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");

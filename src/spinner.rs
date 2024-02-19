@@ -230,6 +230,10 @@ impl Spinner {
         }
     }
 
+    fn spacer(&mut self) {
+        self.spinner.println("");
+    }
+
     fn debug(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Spinner, &self.allowed_formats) || !self.debug {
             self.allowed_formats = HashSet::new();
@@ -348,6 +352,11 @@ impl Formatter for Arc<Mutex<Spinner>> {
     fn outdent(&mut self) {
         let mut fmt = self.lock().unwrap();
         fmt.outdent();
+    }
+
+    fn spacer(&mut self) {
+        let mut fmt = self.lock().unwrap();
+        fmt.spacer()
     }
 
     fn question(&mut self, msg: &dyn Displayable) -> String {

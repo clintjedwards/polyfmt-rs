@@ -85,8 +85,36 @@ macro_rules! error {
     }};
 }
 
+/// Increase the indentation level.
+///
+/// # Examples
+///
+/// ```
+/// println!("Some text")
+/// let _guard = indent!();
+/// println!("This text is more indented than the above")
+/// // Output:
+/// // Some text
+/// //   This text is more indented than the above
+/// ```
 #[macro_export]
 macro_rules! indent {
+    () => {{
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.indent()
+    }};
+}
+
+/// Print a spacer line, determined by the [`Formatter`].
+///
+/// # Examples
+///
+/// ```
+/// spacer!()
+/// ```
+#[macro_export]
+macro_rules! spacer {
     () => {{
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();

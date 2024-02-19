@@ -26,6 +26,7 @@ impl Formatter for Silent {
     fn question(&mut self, _msg: &dyn Displayable) -> String {
         "".to_string()
     }
+    fn spacer(&mut self) {}
 
     fn only(&mut self, _types: Vec<Format>) -> &mut dyn Formatter {
         self

@@ -173,6 +173,8 @@ impl Json {
 
     fn outdent(&mut self) {}
 
+    fn spacer(&mut self) {}
+
     fn question(&mut self, msg: &dyn Displayable) -> String {
         if self.allowed_formats.contains(&Format::Plain) && !self.allowed_formats.is_empty() {
             return "".to_string();
@@ -249,6 +251,11 @@ impl Formatter for Arc<Mutex<Json>> {
     fn outdent(&mut self) {
         let mut fmt = self.lock().unwrap();
         fmt.outdent();
+    }
+
+    fn spacer(&mut self) {
+        let mut fmt = self.lock().unwrap();
+        fmt.spacer();
     }
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
