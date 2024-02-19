@@ -124,9 +124,10 @@ use std::{
 use strum::EnumString;
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 
-#[derive(Debug, EnumString, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, EnumString, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[strum(ascii_case_insensitive)]
 pub enum Format {
+    #[default]
     /// Outputs text in a humanized fashion without any other additions.
     Plain,
 
