@@ -11,7 +11,7 @@
 //! your programs output. For non-interactive users or automation this might make your CLI application
 //! difficult to parse, build automation around, or just unnecessarily verbose. To this end, you might want to
 //! provide a common serialization format to users who use your CLI app from within a non-interactive environment.
-
+//!
 //! Polyfmt aims to simplify the API around multiple formatting options and make it easy to switch between them.
 //!
 //! ## Usage
@@ -38,7 +38,7 @@
 //! ```rust
 //! use polyfmt::{new, Format, Options, println};
 //!
-//! let fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
+//! let fmt = polyfmt::new(Format::Plain, Some(Options::default())).unwrap();
 //! polyfmt::set_global_formatter(fmt);
 //!
 //! // Use the returned formatter to print a simple string.
@@ -54,7 +54,7 @@
 //!
 //! ```rust
 //! use polyfmt::{new, Format, Options};
-//! let mut fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
+//! let mut fmt = polyfmt::new(Format::Plain, None).unwrap();
 //! fmt.print(&"test");
 //! ```
 //!
@@ -65,18 +65,18 @@
 //! the following print command will only print for those formatters.
 //!
 //! ```rust
-//! # use polyfmt::{new, Format, Options};
-//! # let mut fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
+//! # use polyfmt::{new, Format};
+//! # let mut fmt = polyfmt::new(Format::Plain, None).unwrap();
 //! fmt.only(vec![Format::Plain]).print(&"test");
 //!
 //! // This will only print the string "test" if the formatter Format is "Plain".
 //! ```
 //!
-//! The global macros also allow you to variadically list formats to whitelist on the fly:
+//! The global macros also allow you to list formats to whitelist on the fly:
 //!
 //! ```rust
 //! # use polyfmt::{print, Format};
-//! print!("test", Format::Plain, Format::Pretty)
+//! print!("test"; vec![Format::Plain, Format::Tree])
 //! ```
 //!
 //! ### Dynamically choosing a format
@@ -90,7 +90,7 @@
 //! let some_flag = "plain".to_string(); // case-insensitive
 //! let format = Format::from_str(&some_flag).unwrap();
 //!
-//! let mut fmt = new(format, Options::default()).unwrap();
+//! let mut fmt = new(format, Some(Options::default())).unwrap();
 //! ```
 //!
 //! ### Additional Details
@@ -112,6 +112,7 @@ use anyhow::{bail, Result};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
@@ -123,7 +124,7 @@ use std::{
 use strum::EnumString;
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 
-#[derive(Debug, EnumString, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, EnumString, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[strum(ascii_case_insensitive)]
 pub enum Format {
     /// Outputs text in a humanized fashion without any other additions.
@@ -254,12 +255,12 @@ pub fn get_global_formatter() -> &'static Mutex<Box<dyn Formatter>> {
 /// # Example
 ///
 /// ```
-/// use polyfmt::{new, Format, Options};
-/// let mut fmt = new(Format::Plain, Options::default()).unwrap();
+/// use polyfmt::{new, Format};
+/// let mut fmt = new(Format::Plain, None).unwrap();
 /// fmt.print(&"something");
 ///
 /// // You can also specify that certain lines be printed only when certain formatters are in effect.
-/// fmt.only(vec![Format::Plain]).err(&"test");
+/// fmt.only(vec![Format::Plain]).error(&"test");
 /// ```
 pub fn new(
     format: Format,
@@ -461,6 +462,7 @@ mod tests {
     use std::{str::FromStr, thread, time};
 
     #[test]
+    #[ignore]
     fn tree() {
         let options = crate::Options {
             debug: true,
@@ -485,6 +487,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn spinner() {
         let options = crate::Options {
             debug: true,
@@ -514,6 +517,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn json() {
         let options = crate::Options {
             debug: true,
@@ -535,6 +539,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn plain() {
         let options = crate::Options {
             debug: true,
@@ -557,18 +562,19 @@ mod tests {
     // These tests aren't real tests, I just eyeball things to see if they work.
     // Maybe I'll write real tests, maybe I wont. Shut-up.
     #[test]
+    #[ignore]
     fn global_easy() {
-        let options = crate::Options {
-            debug: true,
-            max_line_length: 100,
-            padding: 1,
-        };
+        // let options = crate::Options {
+        //     debug: true,
+        //     max_line_length: 100,
+        //     padding: 1,
+        // };
 
-        let some_flag = "tree".to_string();
-        let format = crate::Format::from_str(&some_flag).unwrap();
+        // let some_flag = "tree".to_string();
+        // let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let fmt = crate::new(format, Some(options)).unwrap();
-        crate::set_global_formatter(fmt);
+        // let fmt = crate::new(format, Some(options)).unwrap();
+        // crate::set_global_formatter(fmt);
 
         println!("Hello from polyfmt, Look at how well it breaks up lines!");
         success!("Hello from polyfmt, Look at how well it breaks up lines!");

@@ -3,6 +3,37 @@
 /// # Examples
 ///
 /// ```
+/// # use polyfmt::{print, Format};
+/// let name = "Clint";
+/// print!("Hello, {name}");
+/// print!("Hello Clint");
+/// print!("Hello, {}", name);
+/// print!("Hello, {}", name; vec![Format::Plain])
+/// ```
+#[macro_export]
+macro_rules! print {
+    // Allows a simple format style string, with some arguments or none.
+    ($s:expr $(, $arg:expr),*) => ({
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.print(&format!("{}", format_args!($s, $($arg),*)));
+    });
+
+    // Allows a simple format style string with some arguments or none and also
+    // accounts for if the user wants to insert a formatter filter.
+    ($s:expr $(, $args:expr)* ; $formats:expr) => {{
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.only($formats).print(&format!("{}", format_args!($s, $($args),*)));
+    }};
+}
+
+/// Print a normal message with a newline and multiple lines support.
+///
+/// # Examples
+///
+/// ```
+/// # use polyfmt::{println, Format};
 /// let name = "Clint";
 /// println!("Hello, {name}");
 /// println!("Hello Clint");
@@ -32,6 +63,7 @@ macro_rules! println {
 /// # Examples
 ///
 /// ```
+/// # use polyfmt::{success, Format};
 /// let name = "Clint";
 /// success!("Hello, {name}");
 /// success!("Hello Clint");
@@ -61,6 +93,7 @@ macro_rules! success {
 /// # Examples
 ///
 /// ```
+/// # use polyfmt::{error, Format};
 /// let name = "Clint";
 /// error!("Hello, {name}");
 /// error!("Hello Clint");
@@ -90,9 +123,10 @@ macro_rules! error {
 /// # Examples
 ///
 /// ```
-/// println!("Some text")
+/// # use polyfmt::{println, indent};
+/// println!("Some text");
 /// let _guard = indent!();
-/// println!("This text is more indented than the above")
+/// println!("This text is more indented than the above");
 /// // Output:
 /// // Some text
 /// //   This text is more indented than the above
@@ -111,14 +145,15 @@ macro_rules! indent {
 /// # Examples
 ///
 /// ```
-/// spacer!()
+/// # use polyfmt::spacer;
+/// spacer!();
 /// ```
 #[macro_export]
 macro_rules! spacer {
     () => {{
         let global_fmtter = $crate::get_global_formatter();
         let mut fmt = global_fmtter.lock().unwrap();
-        fmt.indent()
+        fmt.spacer();
     }};
 }
 
@@ -127,6 +162,7 @@ macro_rules! spacer {
 /// # Examples
 ///
 /// ```
+/// # use polyfmt::{warning, Format};
 /// let name = "Clint";
 /// warning!("Hello, {name}");
 /// warning!("Hello Clint");
@@ -156,10 +192,11 @@ macro_rules! warning {
 /// # Examples
 ///
 /// ```
+/// # use polyfmt::{question, Format};
 /// let name = "Clint";
 /// question!("Hello, {name}");
 /// question!("Hello Clint");
-/// question!("Hello, {}", name; vec![Format::Plain])
+/// question!("Hello, {}", name; vec![Format::Plain]);
 /// let input = question!("Hello, {}", name);
 /// ```
 #[macro_export]
@@ -185,6 +222,7 @@ macro_rules! question {
 /// # Examples
 ///
 /// ```
+/// # use polyfmt::{debug, Format};
 /// let name = "Clint";
 /// debug!("Hello, {name}");
 /// debug!("Hello Clint");

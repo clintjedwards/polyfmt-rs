@@ -65,21 +65,21 @@ impl Plain {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+        let lines = format_text_length(msg, self.indentation_level, self.max_line_length);
 
         if lines.is_empty() {
             return;
         }
 
         println!(
-            "  {}{}",
+            "{}{}",
             " ".repeat(self.indentation_level.into()),
             lines.first().unwrap_or(&"".to_string()),
         );
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!("  {}{}", " ".repeat(self.indentation_level.into()), line);
+            println!("{}{}", " ".repeat(self.indentation_level.into()), line);
         }
 
         defer! {
