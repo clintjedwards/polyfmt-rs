@@ -38,7 +38,7 @@
 //! ```rust
 //! use polyfmt::{new, Format, Options, println};
 //!
-//! let fmt = polyfmt::new(Format::Plain, Some(Options::default())).unwrap();
+//! let fmt = polyfmt::new(Format::Plain, Options::default());
 //! polyfmt::set_global_formatter(fmt);
 //!
 //! // Use the returned formatter to print a simple string.
@@ -54,7 +54,7 @@
 //!
 //! ```rust
 //! use polyfmt::{new, Format, Options};
-//! let mut fmt = polyfmt::new(Format::Plain, None).unwrap();
+//! let mut fmt = polyfmt::new(Format::Plain, Options::default());
 //! fmt.print(&"test");
 //! ```
 //!
@@ -65,8 +65,8 @@
 //! the following print command will only print for those formatters.
 //!
 //! ```rust
-//! # use polyfmt::{new, Format};
-//! # let mut fmt = polyfmt::new(Format::Plain, None).unwrap();
+//! # use polyfmt::{new, Format, Options};
+//! # let mut fmt = polyfmt::new(Format::Plain, Options::default());
 //! fmt.only(vec![Format::Plain]).print(&"test");
 //!
 //! // This will only print the string "test" if the formatter Format is "Plain".
@@ -90,7 +90,7 @@
 //! let some_flag = "plain".to_string(); // case-insensitive
 //! let format = Format::from_str(&some_flag).unwrap();
 //!
-//! let mut fmt = new(format, Some(Options::default())).unwrap();
+//! let mut fmt = new(format, Options::default());
 //! ```
 //!
 //! ### Additional Details
@@ -236,8 +236,7 @@ pub trait Formatter: Debug + Send + Sync {
 /// user using `set_global_formatter`.
 static GLOBAL_FORMATTER: Lazy<Mutex<Box<dyn Formatter>>> = Lazy::new(|| {
     let format = Format::Plain;
-    let options = Options::default();
-    Mutex::new(new(format, Some(options)).unwrap())
+    Mutex::new(new(format, Options::default()))
 });
 
 /// Set the global formatter to a custom formatter.
@@ -255,39 +254,35 @@ pub fn get_global_formatter() -> &'static Mutex<Box<dyn Formatter>> {
 /// # Example
 ///
 /// ```
-/// use polyfmt::{new, Format};
-/// let mut fmt = new(Format::Plain, None).unwrap();
+/// use polyfmt::{new, Format, Options};
+/// let mut fmt = new(Format::Plain, Options::default());
 /// fmt.print(&"something");
 ///
 /// // You can also specify that certain lines be printed only when certain formatters are in effect.
 /// fmt.only(vec![Format::Plain]).error(&"test");
 /// ```
-pub fn new(format: Format, options: Option<Options>) -> Result<Box<dyn Formatter>> {
+pub fn new(format: Format, options: Options) -> Box<dyn Formatter> {
     match format {
         Format::Plain => {
-            let options = options.unwrap_or_default();
             let formatter = plain::Plain::new(options.debug, options.max_line_length);
-            Ok(Box::new(formatter))
+            Box::new(formatter)
         }
         Format::Spinner => {
-            let options = options.unwrap_or_default();
             let formatter =
                 spinner::Spinner::new(options.debug, options.max_line_length, options.padding);
-            Ok(Box::new(formatter))
+            Box::new(formatter)
         }
         Format::Tree => {
-            let options = options.unwrap_or_default();
             let formatter = tree::Tree::new(options.debug, options.max_line_length);
-            Ok(Box::new(formatter))
+            Box::new(formatter)
         }
         Format::Json => {
-            let options = options.unwrap_or_default();
             let formatter = json::Json::new(options.debug);
-            Ok(Box::new(formatter))
+            Box::new(formatter)
         }
         Format::Silent => {
             let formatter = silent::Silent {};
-            Ok(Box::new(formatter))
+            Box::new(formatter)
         }
     }
 }
@@ -470,7 +465,7 @@ mod tests {
         let some_flag = "tree".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let mut fmt = crate::new(format, Some(options)).unwrap();
+        let mut fmt = crate::new(format, options);
 
         fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
@@ -496,7 +491,7 @@ mod tests {
         let some_flag = "spinner".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let mut fmt = crate::new(format, Some(options)).unwrap();
+        let mut fmt = crate::new(format, options);
 
         fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
         thread::sleep(ten_millis);
@@ -525,7 +520,7 @@ mod tests {
         let some_flag = "json".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let mut fmt = crate::new(format, Some(options)).unwrap();
+        let mut fmt = crate::new(format, options);
 
         fmt.print(&"Demoing! ");
         fmt.println(&"Hello from polyfmt");
@@ -547,7 +542,7 @@ mod tests {
         let some_flag = "plain".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let mut fmt = crate::new(format, Some(options)).unwrap();
+        let mut fmt = crate::new(format, options);
 
         fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
         fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
