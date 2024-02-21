@@ -39,7 +39,7 @@ by your user at runtime via flags or config.
 
 ```rust
 use polyfmt::{new, Format, Options, println};
-let fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
+let fmt = polyfmt::new(Format::Plain, Options::default());
 polyfmt::set_global_formatter(fmt);
 // Use the returned formatter to print a simple string.
 println!("something");
@@ -53,7 +53,7 @@ use the formatter you get back from the new function:
 
 ```rust
 use polyfmt::{new, Format, Options};
-let mut fmt = polyfmt::new(Format::Plain, Options::default()).unwrap();
+let mut fmt = polyfmt::new(Format::Plain, Options::default());
 fmt.print(&"test");
 ```
 
@@ -64,14 +64,18 @@ You can use the [only](Formatter::only) function to list formatters for which
 the following print command will only print for those formatters.
 
 ```rust
+use polyfmt::{new, Format, Options};
+let mut fmt = polyfmt::new(Format::Plain, Options::default());
+
 fmt.only(vec![Format::Plain]).print(&"test");
 // This will only print the string "test" if the formatter Format is "Plain".
 ```
 
-The global macros also allow you to variadically list formats to whitelist on the fly:
+The global macros also allow you to list formats to whitelist on the fly:
 
 ```rust
-print!("test", Format::Plain, Format::Pretty)
+use polyfmt::{print, Format};
+print!("test"; vec![Format::Plain, Format::Tree])
 ```
 
 ### Dynamically choosing a format
@@ -81,9 +85,12 @@ So most likely you'll want to automatically figure out which formatter you want 
 a flag of env_var the user passes in.
 
 ```rust
+use polyfmt::{new, Format, Options};
+use std::str::FromStr;
+
 let some_flag = "plain".to_string(); // case-insensitive
 let format = Format::from_str(&some_flag).unwrap();
-let mut fmt = new(format, Options::default()).unwrap();
+let mut fmt = new(format, Options::default());
 ```
 
 ### Additional Details
@@ -91,5 +98,3 @@ let mut fmt = new(format, Options::default()).unwrap();
 - You can turn off color by using the popular `NO_COLOR` environment variable.
 - Anything to be printed must implement Display and Serialize due to the need to possibly print it into both plain
   plaintext and json.
-- When you finish using a formatter you should call the [finish](Formatter::finish) function. This flushes the output
-  buffer and cleans up anything else before your program exists.
