@@ -115,7 +115,6 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    error::Error,
     fmt::{Debug, Display},
     io::Write,
     sync::Mutex,
@@ -263,10 +262,7 @@ pub fn get_global_formatter() -> &'static Mutex<Box<dyn Formatter>> {
 /// // You can also specify that certain lines be printed only when certain formatters are in effect.
 /// fmt.only(vec![Format::Plain]).error(&"test");
 /// ```
-pub fn new(
-    format: Format,
-    options: Option<Options>,
-) -> Result<Box<dyn Formatter>, Box<dyn Error + Send + Sync>> {
+pub fn new(format: Format, options: Option<Options>) -> Result<Box<dyn Formatter>> {
     match format {
         Format::Plain => {
             let options = options.unwrap_or_default();
