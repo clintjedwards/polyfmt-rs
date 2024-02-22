@@ -185,7 +185,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             debug: Default::default(),
-            max_line_length: 80,
+            max_line_length: termion::terminal_size().unwrap_or((80, 80)).0.into(),
             padding: 0,
         }
     }
