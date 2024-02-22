@@ -1,4 +1,4 @@
-use crate::{format_text_length, is_allowed, Displayable, Format, Formatter, IndentGuard};
+use crate::{format_text_by_length, is_allowed, Displayable, Format, Formatter, IndentGuard};
 use colored::Colorize;
 use scopeguard::defer;
 use std::sync::{Arc, Mutex, Weak};
@@ -65,7 +65,7 @@ impl Plain {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level, self.max_line_length);
 
         if lines.is_empty() {
             return;
@@ -93,7 +93,7 @@ impl Plain {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
         if lines.is_empty() {
             return;
@@ -126,7 +126,7 @@ impl Plain {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
         if lines.is_empty() {
             return;
@@ -159,7 +159,7 @@ impl Plain {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 3, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level + 3, self.max_line_length);
 
         if lines.is_empty() {
             return;
@@ -192,7 +192,7 @@ impl Plain {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 8, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level + 8, self.max_line_length);
 
         if lines.is_empty() {
             return;
@@ -244,7 +244,7 @@ impl Plain {
             return "".to_string();
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
         if lines.len() == 1 {
             print!(

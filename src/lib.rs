@@ -93,6 +93,21 @@
 //! let mut fmt = new(format, Options::default());
 //! ```
 //!
+//! ### Indentiation
+//! Polyfmt supports indentation also with a similar implementation to spans in the tracing crate
+//! You initialize the indent, tie it to a guard, and then once that guard drops out of scope the
+//! indentation level will decrement.
+//!
+//! ```rust
+//! # use polyfmt::{indent, println};
+//!
+//! println!("This line is base level of indentation.");
+//! let _guard = indent!();
+//! println!("This line has a greater indentation than the previous line.");
+//! drop(_guard);
+//! println!("This line has the same indentation level as the first.");
+//! ```
+//!
 //! ### Additional Details
 //!
 //! * You can turn off color by using the popular `NO_COLOR` environment variable.
@@ -111,7 +126,9 @@ mod tree;
 use anyhow::{bail, Result};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
+use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -122,6 +139,10 @@ use std::{
 };
 use strum::EnumString;
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
+
+lazy_static! {
+    static ref RE: Regex = Regex::new(r"(\s+)").expect("Invalid regex");
+}
 
 #[derive(Debug, Default, EnumString, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[strum(ascii_case_insensitive)]
@@ -296,8 +317,54 @@ fn is_allowed(current_format: Format, allowed_formats: &HashSet<Format>) -> bool
     true
 }
 
-/// Convenience function to chunk lines of text based on the max line length.
-fn format_text_length(
+fn split_on_whitespace_keep_delimiter_grouped(s: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut current_chunk = String::new();
+    let mut inside_whitespace = false;
+
+    for c in s.chars() {
+        if c.is_whitespace() {
+            if inside_whitespace {
+                // If the current character matches the type of the current whitespace chunk, add it
+                if current_chunk.chars().next().unwrap().is_whitespace()
+                    && c == current_chunk.chars().next().unwrap()
+                {
+                    current_chunk.push(c);
+                } else {
+                    // Different type of whitespace, push the old one, start a new one
+                    result.push(current_chunk);
+                    current_chunk = c.to_string();
+                }
+            } else {
+                // Transitioning from text to whitespace
+                if !current_chunk.is_empty() {
+                    result.push(current_chunk);
+                }
+                current_chunk = c.to_string();
+                inside_whitespace = true;
+            }
+        } else if inside_whitespace {
+            // Transitioning from whitespace to text
+            result.push(current_chunk);
+            current_chunk = c.to_string();
+            inside_whitespace = false;
+        } else {
+            // Continuing with text
+            current_chunk.push(c);
+        }
+    }
+
+    // Don't forget to add the last chunk if there is one
+    if !current_chunk.is_empty() {
+        result.push(current_chunk);
+    }
+
+    result
+}
+
+/// Convenience function to chunk lines of text based on the max line length,
+/// respecting original whitespace, newlines, and avoiding splitting words across lines.
+fn format_text_by_length(
     msg: &dyn Displayable,
     indentation_level: u16,
     max_line_length: usize,
@@ -305,8 +372,7 @@ fn format_text_length(
     let msg = msg.to_string();
     let indentation_level = usize::from(indentation_level);
 
-    // If the indentation level is already past the max line length we can't print anything.
-    if max_line_length < indentation_level {
+    if max_line_length <= indentation_level {
         return vec![];
     }
 
@@ -314,29 +380,49 @@ fn format_text_length(
     let mut lines = Vec::new();
     let mut current_line = String::new();
 
-    for word in msg.split_whitespace() {
-        // Check if adding the next word exceeds the max line width
-        if current_line.len() + word.len() + 1 > max_line_width {
-            // Finish the current line and start a new one
-            lines.push(current_line);
-            current_line = String::new();
-        }
+    for word in split_on_whitespace_keep_delimiter_grouped(&msg) {
+        match word.as_str() {
+            // If we encounter a new line character that is a sign to immediately
+            // end the line, so we add the character to whatever the line is currently
+            // and then add the entire line to the lines vec.
+            "\n" => {
+                lines.push(current_line.clone());
+                current_line = String::new();
+            }
+            _ => {
+                // If the word is just a space character we don't want to preserve it when
+                // starting a new line, so we just skip it.
+                if current_line.is_empty() && word.len() == 1 && word.starts_with(' ') {
+                    continue;
+                }
 
-        if !current_line.is_empty() {
-            current_line.push(' '); // Add space before the word if it's not the beginning of a line
-        }
+                // If the word we're currently processing doesn't make the line
+                // longer than the limit we simply add it to the current_line.
+                if (current_line.len() + word.len()) <= max_line_width {
+                    current_line += &word;
+                    continue;
+                }
 
-        current_line.push_str(word);
+                // If the word we're processing DOES make the line longer then the
+                // limit we first add the current line to the list of lines and then
+                // we create a new line and add it to that line.
+                lines.push(current_line.clone());
+                current_line = String::new();
+
+                // If the word is just a space character we don't want to preserve it when
+                // starting a new line, so we just skip it.
+                if word.len() == 1 && word.starts_with(' ') {
+                    continue;
+                }
+
+                current_line += &word;
+            }
+        }
     }
 
-    // If the last character is whitespace add it back.
-    if msg.split_whitespace().last().unwrap_or_default() == " " {
-        current_line.push(' ');
-    }
-
-    // Add the last line if it's not empty
+    // Make sure that the last line is added.
     if !current_line.is_empty() {
-        lines.push(current_line);
+        lines.push(current_line.clone());
     }
 
     lines
@@ -450,7 +536,8 @@ fn display_choices(choices: &[&String], selected: usize) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{debug, error, indent, println, success, warning};
+    use crate::{error, format_text_by_length, indent, println, Options};
+    use rstest::rstest;
     use std::{str::FromStr, thread, time};
 
     #[test]
@@ -556,28 +643,33 @@ mod tests {
     #[test]
     #[ignore]
     fn global_easy() {
-        use crate::{println, question};
+        use crate::{indent, println, spacer};
         // let options = crate::Options {
         //     debug: true,
-        //     max_line_length: 100,
+        //     max_line_length: 80,
         //     padding: 1,
         // };
 
-        // let some_flag = "tree".to_string();
-        // let format = crate::Format::from_str(&some_flag).unwrap();
+        let some_flag = "tree".to_string();
+        let format = crate::Format::from_str(&some_flag).unwrap();
 
-        // let fmt = crate::new(format, Some(options)).unwrap();
-        // crate::set_global_formatter(fmt);
+        let fmt = crate::new(format, Options::default());
+        crate::set_global_formatter(fmt);
 
-        println!("Hello from polyfmt, Look at how well it breaks up lines!");
-        success!("Hello from polyfmt, Look at how well it breaks up lines!");
-        let _guard = indent!();
-        error!("Hello from polyfmt, Look at how well it breaks up lines!");
-        debug!("Hello from polyfmt, Look at how well it breaks up lines!");
-        warning!("Hello from polyfmt, Look at how well it breaks up lines!");
-        println!("testing things to other things");
-        let my_question = question!("Testing out questions: ");
-        println!("{}", my_question);
+        println!("{} service setup", "Astra");
+        spacer!();
+        println!("{}", "To setup a brand new service we'll need to initialize the infrastructure that allows you \
+        to manage and deploy the service. We'll set up the following for your service:\n".to_owned() +
+           &format!("  • An {} repository for container management.\n", "ECR (Elastic Container Registry)") +
+           &format!("  • {} along with appropriate target groups for efficient traffic distribution.\n", "Load balancers") +
+           &format!("  • An {} service definition to manage your containerized applications.\n", "ECS (Elastic Container Service)") +
+           &format!("  • A {} to initialize your containers and define core functionality like logging.\n", "starter ECS task definition") +
+           &format!("  • Necessary {} for secure, reliable connectivity.\n", "DNS entries and TLS certificates")
+        );
+        spacer!();
+        println!(
+            "Astra will attempt to use Terraform to create this infrastructure on your behalf."
+        );
 
         struct Customer {
             id: String,
@@ -589,6 +681,33 @@ mod tests {
             name: "name".to_string(),
         };
 
+        let _guard = indent!();
         error!("Created customer [{}] {}", customer.id, customer.name);
+    }
+
+    #[rstest]
+    #[case::group_similar_whitespace("Hello, there   beautiful", vec!["Hello,", " ", "there", "   ", "beautiful"])]
+    #[case::differ_between_whitespace_types("The quick\nbrown fox", vec!["The", " ", "quick", "\n", "brown", " ", "fox"])]
+    #[case::leading_spaces("  Leading spaces", vec!["  ", "Leading", " ", "spaces"])]
+    #[case::trailing_spaces("Trailing space ", vec!["Trailing", " ", "space", " "])]
+    #[case::only_spaces("   ", vec!["   "])] // Only spaces
+    #[case::tabs_and_spaces("Mixed   \t tabs and spaces", vec!["Mixed", "   ", "\t", " ", "tabs", " ", "and", " ", "spaces"])]
+    #[case::empty_string("", vec![])] // Empty string
+    fn test_split_on_whitespace_keep_delimiter_grouped(
+        #[case] input: &str,
+        #[case] expected: Vec<&str>,
+    ) {
+        let result = crate::split_on_whitespace_keep_delimiter_grouped(input);
+        let expected_str: Vec<String> = expected.into_iter().map(String::from).collect();
+        assert_eq!(result, expected_str);
+    }
+
+    #[rstest]
+    #[case::simple("Hello", vec!["Hello"])]
+    #[case::proper_length_splitting_on_word("The greatest glory in living lies not in never falling", vec!["The greatest glory in living lies not in", "never falling"])]
+    #[case::preserve_new_lines("The greatest\n glory in living\n lies not in never falling", vec!["The greatest", "glory in living", "lies not in never falling"])]
+    #[case::preserve_multiple_spaces_on_newline("Hello\n  • Some bullet point here", vec!["Hello", "  • Some bullet point here"])]
+    fn test_format_text_length(#[case] input: &str, #[case] expected: Vec<&str>) {
+        assert_eq!(format_text_by_length(&input, 0, 40), expected)
     }
 }

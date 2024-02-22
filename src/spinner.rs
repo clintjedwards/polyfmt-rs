@@ -1,4 +1,4 @@
-use crate::{format_text_length, is_allowed, Displayable, Format, Formatter, IndentGuard};
+use crate::{format_text_by_length, is_allowed, Displayable, Format, Formatter, IndentGuard};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use scopeguard::defer;
@@ -96,7 +96,7 @@ impl Spinner {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level, self.max_line_length);
 
         if lines.is_empty() {
             return;
@@ -125,7 +125,7 @@ impl Spinner {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
         if lines.is_empty() {
             return;
@@ -157,7 +157,7 @@ impl Spinner {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
         if lines.is_empty() {
             return;
@@ -189,7 +189,7 @@ impl Spinner {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
         if lines.is_empty() {
             return;
@@ -240,7 +240,7 @@ impl Spinner {
             return;
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 8, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level + 8, self.max_line_length);
 
         if lines.is_empty() {
             return;
@@ -272,7 +272,7 @@ impl Spinner {
             return "".to_string();
         }
 
-        let lines = format_text_length(msg, self.indentation_level + 2, self.max_line_length);
+        let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
         let mut input = String::from("");
 

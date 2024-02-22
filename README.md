@@ -93,6 +93,23 @@ let format = Format::from_str(&some_flag).unwrap();
 let mut fmt = new(format, Options::default());
 ```
 
+### Indentiation
+
+Polyfmt supports indentation also with a similar implementation to spans in the tracing crate
+You initialize the indent, tie it to a guard, and then once that guard drops out of scope the
+indentation level will decrement.
+
+```rust
+
+# use polyfmt::{indent, println};
+
+println!("This line is base level of indentation.");
+let _guard = indent!();
+println!("This line has a greater indentation than the previous line.");
+drop(_guard);
+println!("This line has the same indentation level as the first.");
+```
+
 ### Additional Details
 
 - You can turn off color by using the popular `NO_COLOR` environment variable.
