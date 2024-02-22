@@ -183,9 +183,14 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Self {
+        let mut max_line_length = termion::terminal_size().unwrap_or((80, 80)).0.into();
+        if max_line_length > 25 {
+            max_line_length -= 5
+        }
+
         Self {
             debug: Default::default(),
-            max_line_length: termion::terminal_size().unwrap_or((80, 80)).0.into(),
+            max_line_length,
             padding: 0,
         }
     }
