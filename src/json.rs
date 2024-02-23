@@ -44,7 +44,7 @@ impl Drop for Guard {
 
 impl Json {
     fn print(&mut self, msg: &dyn Displayable) {
-        if self.allowed_formats.contains(&Format::Plain) {
+        if self.allowed_formats.contains(&Format::Json) {
             return;
         }
 
@@ -64,7 +64,7 @@ impl Json {
     }
 
     fn println(&mut self, msg: &dyn Displayable) {
-        if self.allowed_formats.contains(&Format::Plain) && !self.allowed_formats.is_empty() {
+        if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
             return;
         }
 
@@ -84,7 +84,7 @@ impl Json {
     }
 
     fn error(&mut self, msg: &dyn Displayable) {
-        if self.allowed_formats.contains(&Format::Plain) && !self.allowed_formats.is_empty() {
+        if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
             return;
         }
 
@@ -104,7 +104,7 @@ impl Json {
     }
 
     fn success(&mut self, msg: &dyn Displayable) {
-        if self.allowed_formats.contains(&Format::Plain) && !self.allowed_formats.is_empty() {
+        if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
             return;
         }
 
@@ -124,7 +124,7 @@ impl Json {
     }
 
     fn warning(&mut self, msg: &dyn Displayable) {
-        if self.allowed_formats.contains(&Format::Plain) && !self.allowed_formats.is_empty() {
+        if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
             return;
         }
 
@@ -144,7 +144,7 @@ impl Json {
     }
 
     fn debug(&mut self, msg: &dyn Displayable) {
-        if (self.allowed_formats.contains(&Format::Plain) && !self.allowed_formats.is_empty())
+        if (self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty())
             || !self.debug
         {
             return;
@@ -176,7 +176,7 @@ impl Json {
     fn spacer(&mut self) {}
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
-        if self.allowed_formats.contains(&Format::Plain) && !self.allowed_formats.is_empty() {
+        if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
             return "".to_string();
         }
 

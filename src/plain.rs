@@ -248,7 +248,7 @@ impl Plain {
 
         if lines.len() == 1 {
             print!(
-                "{}{} {} ",
+                "{}{} {}",
                 " ".repeat(self.indentation_level.into()),
                 "?".magenta(),
                 lines.first().unwrap_or(&"".to_string()),
@@ -274,7 +274,7 @@ impl Plain {
                 } else {
                     // Last line, use print! instead
                     print!(
-                        "{}{} ",
+                        "{}{}",
                         " ".repeat((self.indentation_level + 2).into()),
                         line
                     );

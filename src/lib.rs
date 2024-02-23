@@ -541,7 +541,7 @@ fn display_choices(choices: &[&String], selected: usize) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{error, format_text_by_length, indent, println, Options};
+    use crate::{error, format_text_by_length, indent, println, question};
     use rstest::rstest;
     use std::{str::FromStr, thread, time};
 
@@ -649,17 +649,22 @@ mod tests {
     #[ignore]
     fn global_easy() {
         use crate::{indent, println, spacer};
-        // let options = crate::Options {
-        //     debug: true,
-        //     max_line_length: 80,
-        //     padding: 1,
-        // };
+        let options = crate::Options {
+            debug: true,
+            max_line_length: 40,
+            padding: 1,
+        };
 
         let some_flag = "tree".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
 
-        let fmt = crate::new(format, Options::default());
+        let fmt = crate::new(format, options);
         crate::set_global_formatter(fmt);
+
+        _ = question!("To setup a brand: ");
+        _ = question!("To setup a brand: ");
+        println!("Hello, we have a thing that we do");
+        _ = question!("To setup a brand: ");
 
         println!("{} service setup", "Astra");
         spacer!();

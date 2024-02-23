@@ -277,19 +277,32 @@ impl Spinner {
         let mut input = String::from("");
 
         self.spinner.suspend(|| {
-            self.spinner.println(format!(
-                "{}{} {}",
-                " ".repeat(self.indentation_level.into()),
-                "?".magenta(),
-                lines.first().unwrap_or(&"".to_string())
-            ));
+            if lines.len() == 1 {
+                print!(
+                    "{}{} {}",
+                    " ".repeat(self.indentation_level.into()),
+                    "?".magenta(),
+                    lines.first().unwrap_or(&"".to_string()),
+                );
+            } else {
+                println!(
+                    "{}{} {}",
+                    " ".repeat(self.indentation_level.into()),
+                    "?".magenta(),
+                    lines.first().unwrap_or(&"".to_string()),
+                );
 
-            for line in lines.iter().skip(1) {
-                self.spinner.println(format!(
-                    "{}{}",
-                    " ".repeat((self.indentation_level + 2).into()),
-                    line
-                ));
+                // Print the remaining lines except the last with println!
+                let lines_count = lines.len();
+                for (index, line) in lines.iter().enumerate().skip(1) {
+                    if index + 1 < lines_count {
+                        // Not the last line
+                        println!("{} {}", " ".repeat(self.indentation_level.into()), line);
+                    } else {
+                        // Last line, use print! instead
+                        print!("{} {}", " ".repeat(self.indentation_level.into()), line);
+                    }
+                }
             }
 
             std::io::stdout().flush().unwrap();
