@@ -648,7 +648,7 @@ mod tests {
     #[test]
     #[ignore]
     fn global_easy() {
-        use crate::{indent, println, spacer};
+        use crate::{indent, print, println, spacer};
         let options = crate::Options {
             debug: true,
             max_line_length: 40,
@@ -668,6 +668,7 @@ mod tests {
 
         println!("{} service setup", "Astra");
         spacer!();
+        print!("\n");
         println!("{}", "To setup a brand new service we'll need to initialize the infrastructure that allows you \
         to manage and deploy the service. We'll set up the following for your service:\n".to_owned() +
            &format!("  • An {} repository for container management.\n", "ECR (Elastic Container Registry)") +

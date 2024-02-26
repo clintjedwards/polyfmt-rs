@@ -55,7 +55,7 @@ impl Tree {
             return;
         }
 
-        print!("{} {msg}", "├─".magenta());
+        print!("{}{msg}", "│ ".magenta());
 
         defer! {
             self.allowed_formats = HashSet::new();
