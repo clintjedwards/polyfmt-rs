@@ -167,7 +167,7 @@ pub enum Format {
 }
 
 /// Trait for the indentation guard.
-pub trait IndentGuard {}
+pub trait IndentGuard: Send + Sync {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Options {
