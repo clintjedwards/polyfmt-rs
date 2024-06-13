@@ -70,7 +70,16 @@ impl Tree {
 
         let lines = format_text_by_length(msg, self.indentation_level, self.max_line_length);
 
+        // If we're completely empty but the user wants a new line they probably want to leave
+        // a space but not use the spacer function. We should just print a space.
         if lines.is_empty() {
+            println!("{}", "│ ".magenta());
+            return;
+        }
+
+        // Similarly if the user has only entered a new line they probably want to do the same thing.
+        if lines.len() == 1 && lines[0].is_empty() {
+            println!("{}", "│ ".magenta());
             return;
         }
 

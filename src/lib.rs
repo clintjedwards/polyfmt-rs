@@ -704,6 +704,7 @@ mod tests {
     #[case::only_spaces("   ", vec!["   "])] // Only spaces
     #[case::tabs_and_spaces("Mixed   \t tabs and spaces", vec!["Mixed", "   ", "\t", " ", "tabs", " ", "and", " ", "spaces"])]
     #[case::empty_string("", vec![])] // Empty string
+    #[case::trailing_newlines("Sentence then trailingnewlines\n\n", vec!["Sentence", " ", "then", " ", "trailingnewlines", "\n\n"])] // trailing newlines
     fn test_split_on_whitespace_keep_delimiter_grouped(
         #[case] input: &str,
         #[case] expected: Vec<&str>,

@@ -12,6 +12,13 @@
 /// ```
 #[macro_export]
 macro_rules! print {
+    // Simply prints a newline when nothing else is given.
+    () => ({
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.print("");
+    });
+
     // Allows a simple format style string, with one arguments or none.
     // e.g: print!("Hello, {}", Clint) and print!("Hello, {clint}")
     ($s:expr $(, $arg:expr),*) => ({
@@ -53,6 +60,13 @@ macro_rules! print {
 /// ```
 #[macro_export]
 macro_rules! println {
+    // Simply prints a newline when nothing else is given.
+    () => ({
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.println(&"\n");
+    });
+
     // Allows a simple format style string, with one arguments or none.
     // e.g: print!("Hello, {}", Clint) and print!("Hello, {clint}")
     ($s:expr $(, $arg:expr),*) => ({
