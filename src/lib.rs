@@ -470,7 +470,7 @@ impl Spinner {
 /// The Hashmap passed in is the mapping of label to actual raw value. This is helpful when you want the raw value
 /// for passing in to another function but the label to display to the user.
 /// Returns the (label, value) tuple that the user chose.
-pub fn display_chooser(choices: HashMap<String, String>) -> Result<(String, String)> {
+pub fn choose_one(choices: HashMap<String, String>) -> Result<(String, String)> {
     let mut labels: Vec<_> = choices.keys().collect();
     labels.sort();
 
@@ -537,6 +537,105 @@ fn display_choices(choices: &[&String], selected: usize) {
             _ = write!(std::io::stdout(), "  {}\r\n", choice);
         }
     }
+}
+
+fn display_radio_choices(choices: &[(&str, bool)], selected: usize) {
+    for (index, choice) in choices.iter().enumerate() {
+        // I know this is weird, but the colored crate doesn't seem to work without
+        // doing this hack.
+        let prefix = if index == selected {
+            ">".blue().to_string()
+        } else {
+            " ".into()
+        };
+
+        let selection = if choice.1 {
+            format!("[{}]", "*".green())
+        } else {
+            "[ ]".into()
+        };
+
+        let choice_text = if choice.1 {
+            choice.0.green().to_string()
+        } else {
+            choice.0.into()
+        };
+
+        _ = write!(
+            std::io::stdout(),
+            "{} {} {}\r\n",
+            prefix,
+            selection,
+            choice_text
+        );
+    }
+}
+
+/// Creates a TUI radio selection modal.
+/// The values passed in are mutated and the boolean value coupled is changed to true when the user has selected
+/// a value.
+pub fn choose_many(choices: &mut [(&str, bool)]) -> Result<()> {
+    let mut selected_index = 0;
+
+    display_radio_choices(choices, selected_index);
+
+    // Get the standard input stream.
+    let stdin = std::io::stdin();
+    // Get the standard output stream and go to raw mode.
+    let mut stdout = std::io::stdout().into_raw_mode()?;
+
+    for c in stdin.keys() {
+        match c? {
+            Key::Ctrl('c') => break,
+            Key::Up if selected_index > 0 => {
+                selected_index -= 1;
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::cursor::Up(choices.len() as u16),
+                    termion::clear::AfterCursor
+                )?;
+                display_radio_choices(choices, selected_index);
+            }
+            Key::Down if selected_index < choices.len() - 1 => {
+                selected_index += 1;
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::cursor::Up(choices.len() as u16),
+                    termion::clear::AfterCursor
+                )?;
+                display_radio_choices(choices, selected_index);
+            }
+            Key::Char(' ') => {
+                choices[selected_index].1 = !choices[selected_index].1;
+
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::cursor::Up(choices.len() as u16),
+                    termion::clear::AfterCursor
+                )?;
+                display_radio_choices(choices, selected_index);
+            }
+            Key::Char('\n') => {
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::cursor::Up(choices.len() as u16),
+                    termion::clear::AfterCursor
+                )?;
+                write!(stdout, "{}", termion::cursor::Show)?;
+                stdout.flush()?;
+
+                return Ok(());
+            }
+            _ => {}
+        }
+        stdout.flush()?;
+    }
+
+    bail!("display chooser was interrupted before ending properly")
 }
 
 #[cfg(test)]
