@@ -539,8 +539,51 @@ fn display_choices(choices: &[&String], selected: usize) {
     }
 }
 
-fn display_radio_choices(choices: &[(&str, bool)], selected: usize) {
-    for (index, choice) in choices.iter().enumerate() {
+fn clamp_window(selected: usize, start: usize, len: usize, page_size: usize) -> usize {
+    let page = page_size.min(len);
+    if len <= page {
+        return 0;
+    }
+
+    // keep existing start if it’s valid
+    let mut s = start.min(len.saturating_sub(page));
+
+    // ensure selected stays visible
+    if selected < s {
+        s = selected;
+    } else if selected >= s + page {
+        s = selected + 1 - page;
+    }
+
+    s.min(len.saturating_sub(page))
+}
+
+fn display_radio_choices(
+    choices: &[(&str, bool)],
+    selected: usize,
+    start_index: usize,
+    page_size: usize,
+) {
+    use std::io::Write;
+
+    let len = choices.len();
+    if len == 0 {
+        return;
+    }
+
+    // Show either the whole list (if it fits) or exactly page_size items.
+    let page = page_size.min(len);
+
+    // Clamp the window start so we always have a full page when possible.
+    let max_start = len.saturating_sub(page);
+    let start_point = start_index.min(max_start);
+
+    // End is start + page (safe because start_point <= max_start).
+    let end_point = start_point + page;
+
+    for (i, choice) in choices[start_point..end_point].iter().enumerate() {
+        let index = start_point + i; // global index for highlight
+
         // I know this is weird, but the colored crate doesn't seem to work without
         // doing this hack.
         let prefix = if index == selected {
@@ -555,10 +598,16 @@ fn display_radio_choices(choices: &[(&str, bool)], selected: usize) {
             "[ ]".into()
         };
 
-        let choice_text = if choice.1 {
-            choice.0.green().to_string()
+        let mut choice_text = if index == selected {
+            choice.0.blue().underline().to_string()
         } else {
             choice.0.into()
+        };
+
+        if choice.1 && index == selected {
+            choice_text = choice.0.green().underline().to_string()
+        } else if choice.1 {
+            choice_text = choice.0.green().to_string()
         };
 
         _ = write!(
@@ -574,62 +623,84 @@ fn display_radio_choices(choices: &[(&str, bool)], selected: usize) {
 /// Creates a TUI radio selection modal.
 /// The values passed in are mutated and the boolean value coupled is changed to true when the user has selected
 /// a value.
-pub fn choose_many(choices: &mut [(&str, bool)]) -> Result<()> {
-    let mut selected_index = 0;
+pub fn choose_many(choices: &mut [(&str, bool)], page_size: usize) -> Result<()> {
+    use std::io::Write;
 
-    display_radio_choices(choices, selected_index);
+    if choices.is_empty() {
+        return Ok(());
+    }
+
+    let mut selected_index = 0;
+    let mut start_index = clamp_window(selected_index, 0, choices.len(), page_size);
+
+    // initial draw
+    display_radio_choices(choices, selected_index, start_index, page_size);
 
     // Get the standard input stream.
     let stdin = std::io::stdin();
     // Get the standard output stream and go to raw mode.
     let mut stdout = std::io::stdout().into_raw_mode()?;
 
-    for c in stdin.keys() {
-        match c? {
+    // Always move up by the visible page height
+    let up_lines = page_size.min(choices.len()) as u16;
+
+    for key in stdin.keys() {
+        match key? {
             Key::Ctrl('c') => break,
+
             Key::Up if selected_index > 0 => {
                 selected_index -= 1;
-                write!(
-                    stdout,
-                    "{}{}",
-                    termion::cursor::Up(choices.len() as u16),
-                    termion::clear::AfterCursor
-                )?;
-                display_radio_choices(choices, selected_index);
-            }
-            Key::Down if selected_index < choices.len() - 1 => {
-                selected_index += 1;
-                write!(
-                    stdout,
-                    "{}{}",
-                    termion::cursor::Up(choices.len() as u16),
-                    termion::clear::AfterCursor
-                )?;
-                display_radio_choices(choices, selected_index);
-            }
-            Key::Char(' ') => {
-                choices[selected_index].1 = !choices[selected_index].1;
+                start_index = clamp_window(selected_index, start_index, choices.len(), page_size);
 
                 write!(
                     stdout,
                     "{}{}",
-                    termion::cursor::Up(choices.len() as u16),
+                    termion::cursor::Up(up_lines),
                     termion::clear::AfterCursor
                 )?;
-                display_radio_choices(choices, selected_index);
+                display_radio_choices(choices, selected_index, start_index, page_size);
             }
+
+            Key::Down if selected_index < choices.len() - 1 => {
+                selected_index += 1;
+                start_index = clamp_window(selected_index, start_index, choices.len(), page_size);
+
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::cursor::Up(up_lines),
+                    termion::clear::AfterCursor
+                )?;
+                display_radio_choices(choices, selected_index, start_index, page_size);
+            }
+
+            Key::Char(' ') => {
+                choices[selected_index].1 = !choices[selected_index].1;
+
+                // (harmless) keep window clamped
+                start_index = clamp_window(selected_index, start_index, choices.len(), page_size);
+
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::cursor::Up(up_lines),
+                    termion::clear::AfterCursor
+                )?;
+                display_radio_choices(choices, selected_index, start_index, page_size);
+            }
+
             Key::Char('\n') => {
                 write!(
                     stdout,
                     "{}{}",
-                    termion::cursor::Up(choices.len() as u16),
+                    termion::cursor::Up(up_lines),
                     termion::clear::AfterCursor
                 )?;
                 write!(stdout, "{}", termion::cursor::Show)?;
                 stdout.flush()?;
-
                 return Ok(());
             }
+
             _ => {}
         }
         stdout.flush()?;
