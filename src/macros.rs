@@ -212,6 +212,50 @@ macro_rules! spacer {
     }};
 }
 
+/// Temporarily pauses dynamic or animated output.
+///
+/// This is primarily used by formatters that render animated elements such as
+/// spinners. When paused, the formatter should stop any background updates or
+/// redraw loops so that the terminal can be safely used for blocking or
+/// interactive operations (for example, opening a text editor or prompting
+/// for input).
+///
+/// For non-animated formatters (like [`Plain`](Format::Plain) or
+/// [`Json`](Format::Json)), this method is typically a no-op.
+#[macro_export]
+macro_rules! pause {
+    () => {{
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.pause();
+    }};
+}
+
+/// Resumes dynamic or animated output after a pause.
+///
+/// This is the counterpart to [`pause`](Self::pause). Implementations that
+/// manage spinners or other periodic redraws should restore the display to
+/// its active state, continuing from where it left off.
+///
+/// For non-animated formatters, this method is typically a no-op.
+#[macro_export]
+macro_rules! resume {
+    () => {{
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.resume();
+    }};
+}
+
+#[macro_export]
+macro_rules! finish {
+    () => {{
+        let global_fmtter = $crate::get_global_formatter();
+        let mut fmt = global_fmtter.lock().unwrap();
+        fmt.finish();
+    }};
+}
+
 /// Print an warning message with an exclamation mark.
 ///
 /// # Examples
