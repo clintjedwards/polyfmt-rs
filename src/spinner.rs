@@ -234,6 +234,14 @@ impl Spinner {
         self.spinner.println("");
     }
 
+    fn pause(&mut self) {
+        self.spinner.disable_steady_tick();
+    }
+
+    fn start(&mut self) {
+        self.spinner.enable_steady_tick(Duration::from_millis(120));
+    }
+
     fn debug(&mut self, msg: &dyn Displayable) {
         if !is_allowed(Format::Spinner, &self.allowed_formats) || !self.debug {
             self.allowed_formats = HashSet::new();
@@ -370,6 +378,16 @@ impl Formatter for Arc<Mutex<Spinner>> {
     fn spacer(&mut self) {
         let mut fmt = self.lock().unwrap();
         fmt.spacer()
+    }
+
+    fn pause(&mut self) {
+        let fmt = self.lock().unwrap();
+        fmt.spinner.disable_steady_tick();
+    }
+
+    fn resume(&mut self) {
+        let fmt = self.lock().unwrap();
+        fmt.spinner.enable_steady_tick(Duration::from_millis(120));
     }
 
     fn question(&mut self, msg: &dyn Displayable) -> String {

@@ -112,9 +112,10 @@
 //!
 //! * You can turn off color by using the popular `NO_COLOR` environment variable.
 //! * Anything to be printed must implement Display and Serialize due to the need to possibly print it into both plain
-//! plaintext and json.
+//!   plaintext and json.
 //! * When you finish using a formatter you should call the [finish](Formatter::finish) function. This flushes the output
-//! buffer and cleans up anything else before your program exists.
+//!   buffer and cleans up anything else before your program exists.
+//!
 
 mod json;
 pub mod macros;
@@ -200,13 +201,13 @@ impl Default for Options {
 /// This allows polyfmt to not only print input given to it, but intelligently parse types into JSON when the formatter
 /// requires it.
 pub trait Displayable: erased_serde::Serialize + Display {
-    fn as_serialize(&self) -> &(dyn erased_serde::Serialize);
+    fn as_serialize(&self) -> &dyn erased_serde::Serialize;
 }
 
 // Blanket implementation for Displayable on any type that implements the combination of traits that equal displayable.
 impl<T: erased_serde::Serialize + Display> Displayable for T {
-    fn as_serialize(&self) -> &(dyn erased_serde::Serialize) {
-        self as &(dyn erased_serde::Serialize)
+    fn as_serialize(&self) -> &dyn erased_serde::Serialize {
+        self as &dyn erased_serde::Serialize
     }
 }
 
@@ -242,6 +243,27 @@ pub trait Formatter: Debug + Send + Sync {
 
     /// Prints a spacer where the type of spacer is determined by the [`Formatter`]
     fn spacer(&mut self);
+
+    /// Temporarily pauses dynamic or animated output.
+    ///
+    /// This is primarily used by formatters that render animated elements such as
+    /// spinners. When paused, the formatter should stop any background updates or
+    /// redraw loops so that the terminal can be safely used for blocking or
+    /// interactive operations (for example, opening a text editor or prompting
+    /// for input).
+    ///
+    /// For non-animated formatters (like [`Plain`](Format::Plain) or
+    /// [`Json`](Format::Json)), this method is typically a no-op.
+    fn pause(&mut self);
+
+    /// Resumes dynamic or animated output after a pause.
+    ///
+    /// This is the counterpart to [`pause`](Self::pause). Implementations that
+    /// manage spinners or other periodic redraws should restore the display to
+    /// its active state, continuing from where it left off.
+    ///
+    /// For non-animated formatters, this method is typically a no-op.
+    fn resume(&mut self);
 
     /// Prints the message noting it as a question to the user.
     /// It additionally also collects user input and returns it.
@@ -755,6 +777,7 @@ mod tests {
 
         let mut fmt = crate::new(format, options);
 
+        fmt.print(&"Processing line");
         fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
         thread::sleep(ten_millis);
 
@@ -762,6 +785,14 @@ mod tests {
         thread::sleep(ten_millis);
 
         fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
+        thread::sleep(ten_millis);
+
+        fmt.print(&"Look I can stop spinning");
+        fmt.pause();
+        thread::sleep(ten_millis);
+
+        fmt.print(&"Okay lets keep going");
+        fmt.resume();
         thread::sleep(ten_millis);
 
         fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");

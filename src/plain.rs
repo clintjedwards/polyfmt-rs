@@ -238,6 +238,12 @@ impl Plain {
         println!();
     }
 
+    #[allow(dead_code)]
+    fn pause(&mut self) {}
+
+    #[allow(dead_code)]
+    fn start(&mut self) {}
+
     fn question(&mut self, msg: &dyn Displayable) -> String {
         if !is_allowed(Format::Plain, &self.allowed_formats) {
             self.allowed_formats = HashSet::new();
@@ -349,6 +355,10 @@ impl Formatter for Arc<Mutex<Plain>> {
         let mut fmt = self.lock().unwrap();
         fmt.spacer()
     }
+
+    fn pause(&mut self) {}
+
+    fn resume(&mut self) {}
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
         let mut fmt = self.lock().unwrap();

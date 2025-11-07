@@ -175,6 +175,12 @@ impl Json {
 
     fn spacer(&mut self) {}
 
+    #[allow(dead_code)]
+    fn pause(&mut self) {}
+
+    #[allow(dead_code)]
+    fn start(&mut self) {}
+
     fn question(&mut self, msg: &dyn Displayable) -> String {
         if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
             return "".to_string();
@@ -257,6 +263,10 @@ impl Formatter for Arc<Mutex<Json>> {
         let mut fmt = self.lock().unwrap();
         fmt.spacer();
     }
+
+    fn pause(&mut self) {}
+
+    fn resume(&mut self) {}
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
         let mut fmt = self.lock().unwrap();

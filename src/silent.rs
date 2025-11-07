@@ -27,6 +27,8 @@ impl Formatter for Silent {
         "".to_string()
     }
     fn spacer(&mut self) {}
+    fn pause(&mut self) {}
+    fn resume(&mut self) {}
 
     fn only(&mut self, _types: Vec<Format>) -> &mut dyn Formatter {
         self
