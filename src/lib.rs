@@ -770,7 +770,7 @@ mod tests {
             max_line_length: 40,
             padding: 1,
         };
-        let ten_millis = time::Duration::from_secs(1);
+        let ten_millis = time::Duration::from_secs(2);
 
         let some_flag = "spinner".to_string();
         let format = crate::Format::from_str(&some_flag).unwrap();
@@ -788,11 +788,13 @@ mod tests {
         thread::sleep(ten_millis);
 
         fmt.print(&"Look I can stop spinning");
+        fmt.println(&"And I can still print things");
         fmt.pause();
         thread::sleep(ten_millis);
 
         fmt.print(&"Okay lets keep going");
         fmt.resume();
+        fmt.println(&"Testing again");
         thread::sleep(ten_millis);
 
         fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");

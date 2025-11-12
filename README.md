@@ -30,7 +30,7 @@ println!("Hello from polyfmt");
 ```
 
 This is good for simple implementations but obviously the whole point of this library is being able to switch
-formatters. To do this you can still use a global formatter. (Which is available whereever polyfmt is imported)
+formatters. To do this you can still use a global formatter. (Which is available wherever polyfmt is imported)
 
 ### Altering the global formatter
 
@@ -93,7 +93,7 @@ let format = Format::from_str(&some_flag).unwrap();
 let mut fmt = new(format, Options::default());
 ```
 
-### Indentiation
+### Indentation
 
 Polyfmt supports indentation also with a similar implementation to spans in the tracing crate
 You initialize the indent, tie it to a guard, and then once that guard drops out of scope the
