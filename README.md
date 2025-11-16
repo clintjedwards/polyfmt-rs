@@ -4,6 +4,12 @@
 Useful for CLI applications where you might want to provide JSON output for machine users,
 but pretty output for interactive users.
 
+
+ChatGPT sums it up as:
+
+> A relatively unique “output facade” for Rust CLI tools that unifies pretty UX
+> (spinners / indentation / trees) and machine-friendly JSON, under a single, easy-swap Format abstraction.
+
 <img src="./demo.gif" />
 
 ## Why
