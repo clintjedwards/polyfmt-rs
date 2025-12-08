@@ -408,43 +408,45 @@ fn format_text_by_length(
     let mut current_line = String::new();
 
     for word in split_on_whitespace_keep_delimiter_grouped(&msg) {
-        match word.as_str() {
-            // If we encounter a new line character that is a sign to immediately
-            // end the line, so we add the character to whatever the line is currently
-            // and then add the entire line to the lines vec.
-            "\n" => {
+        // If we encounter a new line character that is a sign to immediately
+        // end the line, so we add the character to whatever the line is currently
+        // and then add the entire line to the lines vec. Sometimes the newlines are back to back though,
+        // which show up as "\n\n". In this case we should add that amount of newlines.
+        if word.starts_with('\n') {
+            dbg!(word.len());
+            for _ in word.chars() {
                 lines.push(current_line.clone());
                 current_line = String::new();
             }
-            _ => {
-                // If the word is just a space character we don't want to preserve it when
-                // starting a new line, so we just skip it.
-                if current_line.is_empty() && word.len() == 1 && word.starts_with(' ') {
-                    continue;
-                }
-
-                // If the word we're currently processing doesn't make the line
-                // longer than the limit we simply add it to the current_line.
-                if (current_line.len() + word.len()) <= max_line_width {
-                    current_line += &word;
-                    continue;
-                }
-
-                // If the word we're processing DOES make the line longer then the
-                // limit we first add the current line to the list of lines and then
-                // we create a new line and add it to that line.
-                lines.push(current_line.clone());
-                current_line = String::new();
-
-                // If the word is just a space character we don't want to preserve it when
-                // starting a new line, so we just skip it.
-                if word.len() == 1 && word.starts_with(' ') {
-                    continue;
-                }
-
-                current_line += &word;
-            }
+            continue;
         }
+
+        // If the word is just a space character we don't want to preserve it when
+        // starting a new line, so we just skip it.
+        if current_line.is_empty() && word.len() == 1 && word.starts_with(' ') {
+            continue;
+        }
+
+        // If the word we're currently processing doesn't make the line
+        // longer than the limit we simply add it to the current_line.
+        if (current_line.len() + word.len()) <= max_line_width {
+            current_line += &word;
+            continue;
+        }
+
+        // If the word we're processing DOES make the line longer then the
+        // limit we first add the current line to the list of lines and then
+        // we create a new line and add it to that line.
+        lines.push(current_line.clone());
+        current_line = String::new();
+
+        // If the word is just a space character we don't want to preserve it when
+        // starting a new line, so we just skip it.
+        if word.len() == 1 && word.starts_with(' ') {
+            continue;
+        }
+
+        current_line += &word;
     }
 
     // Make sure that the last line is added.
@@ -922,6 +924,7 @@ mod tests {
     #[case::proper_length_splitting_on_word("The greatest glory in living lies not in never falling", vec!["The greatest glory in living lies not in", "never falling"])]
     #[case::preserve_new_lines("The greatest\n glory in living\n lies not in never falling", vec!["The greatest", "glory in living", "lies not in never falling"])]
     #[case::preserve_multiple_spaces_on_newline("Hello\n  • Some bullet point here", vec!["Hello", "  • Some bullet point here"])]
+    #[case::preserve_double_newlines("Top line before the gap\n\nLine after the gap", vec!["Top line before the gap", "", "Line after the gap"])]
     fn test_format_text_length(#[case] input: &str, #[case] expected: Vec<&str>) {
         assert_eq!(format_text_by_length(&input, 0, 40), expected)
     }
