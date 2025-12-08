@@ -1,4 +1,4 @@
-use crate::{Displayable, Format, Formatter, IndentGuard};
+use crate::{is_allowed, Displayable, Format, Formatter, IndentGuard};
 use scopeguard::defer;
 use serde_json::json;
 use std::sync::{Arc, Mutex, Weak};
@@ -44,7 +44,8 @@ impl Drop for Guard {
 
 impl Json {
     fn print(&mut self, msg: &dyn Displayable) {
-        if self.allowed_formats.contains(&Format::Json) {
+        if !is_allowed(Format::Json, &self.allowed_formats) {
+            self.allowed_formats = HashSet::new();
             return;
         }
 
@@ -64,7 +65,8 @@ impl Json {
     }
 
     fn println(&mut self, msg: &dyn Displayable) {
-        if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
+        if !is_allowed(Format::Json, &self.allowed_formats) {
+            self.allowed_formats = HashSet::new();
             return;
         }
 
@@ -84,7 +86,8 @@ impl Json {
     }
 
     fn error(&mut self, msg: &dyn Displayable) {
-        if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
+        if !is_allowed(Format::Json, &self.allowed_formats) {
+            self.allowed_formats = HashSet::new();
             return;
         }
 
@@ -104,7 +107,8 @@ impl Json {
     }
 
     fn success(&mut self, msg: &dyn Displayable) {
-        if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
+        if !is_allowed(Format::Json, &self.allowed_formats) {
+            self.allowed_formats = HashSet::new();
             return;
         }
 
@@ -124,7 +128,8 @@ impl Json {
     }
 
     fn warning(&mut self, msg: &dyn Displayable) {
-        if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
+        if !is_allowed(Format::Json, &self.allowed_formats) {
+            self.allowed_formats = HashSet::new();
             return;
         }
 
@@ -144,9 +149,8 @@ impl Json {
     }
 
     fn debug(&mut self, msg: &dyn Displayable) {
-        if (self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty())
-            || !self.debug
-        {
+        if !is_allowed(Format::Json, &self.allowed_formats) {
+            self.allowed_formats = HashSet::new();
             return;
         }
 
@@ -182,7 +186,8 @@ impl Json {
     fn start(&mut self) {}
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
-        if self.allowed_formats.contains(&Format::Json) && !self.allowed_formats.is_empty() {
+        if !is_allowed(Format::Json, &self.allowed_formats) {
+            self.allowed_formats = HashSet::new();
             return "".to_string();
         }
 
