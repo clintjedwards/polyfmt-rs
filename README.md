@@ -4,11 +4,8 @@
 Useful for CLI applications where you might want to provide JSON output for machine users,
 but pretty output for interactive users.
 
-
-ChatGPT sums it up as:
-
-> A relatively unique “output facade” for Rust CLI tools that unifies pretty UX
-> (spinners / indentation / trees) and machine-friendly JSON, under a single, easy-swap Format abstraction.
+> An “output facade” for Rust CLI tools that unifies pretty UX (spinners / indentation / trees) and
+> machine-friendly JSON, under a single, easy-swap Format abstraction.
 
 <img src="./demo.gif" />
 
@@ -119,5 +116,5 @@ println!("This line has the same indentation level as the first.");
 ### Additional Details
 
 - You can turn off color by using the popular `NO_COLOR` environment variable.
-- Anything to be printed must implement Display and Serialize due to the need to possibly print it into both plain
-  plaintext and json.
+- Anything to be printed must implement Display and Serialize due to the need to possibly print it into both plaintext
+  and json.
