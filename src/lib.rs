@@ -93,7 +93,48 @@
 //! let mut fmt = new(format, Options::default());
 //! ```
 //!
-//! ### Indentiation
+//! ### Tuning `Options`
+//!
+//! `Options::default()` gets you sensible defaults (no debug output, auto max line length based on terminal width,
+//! zero padding, line-buffered stdout). You can tweak individual fields with builder-style helpers:
+//!
+//! ```
+//! # use polyfmt::Options;
+//! let opts = Options::default()
+//!     .with_debug(true)
+//!     .with_max_line_length(60)
+//!     .with_padding(2);
+//! ```
+//!
+//! Builder helpers:
+//! * [`Options::with_debug`] — enable/disable debug lines (default: off).
+//! * [`Options::with_max_line_length`] — override wrapping length (default: terminal width minus a margin).
+//! * [`Options::with_padding`] — add leading spaces (default: 0).
+//! * [`Options::with_custom_output_target`] — send output to any `Write + Send + 'static` target (files, buffers,
+//!   sockets).
+//!
+//! Note: Spinner falls back to plain when using a custom target because spinners only make sense on a TTY.
+//!
+//! ### Redirecting output (stdout, files, buffers)
+//!
+//! By default polyfmt writes to stdout (line-buffered). You can point output at any `Write + Send + Sync`
+//! target (e.g., file, buffer, socket) via [`Options::with_custom_output_target`]:
+//!
+//! ```
+//! # use polyfmt::{new, Format, Options};
+//! # use std::fs::File;
+//! let file = File::create("polyfmt.log")?;
+//! let opts = Options::default().with_custom_output_target(file);
+//! let mut fmt = new(Format::Plain, opts);
+//! fmt.println(&"Hello to a file");
+//! fmt.finish();
+//! # Ok::<(), std::io::Error>(())
+//! ```
+//!
+//! The spinner formatter only makes sense on a TTY; if you request [`Format::Spinner`] with a custom output target,
+//! polyfmt will fall back to the plain formatter.
+//!
+//! ### Indentation
 //! Polyfmt supports indentation also with a similar implementation to spans in the tracing crate
 //! You initialize the indent, tie it to a guard, and then once that guard drops out of scope the
 //! indentation level will decrement.
@@ -135,7 +176,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     io::Write,
-    sync::Mutex,
+    sync::{Arc, Mutex},
     time::Duration,
 };
 use strum::EnumString;
@@ -170,16 +211,70 @@ pub enum Format {
 /// Trait for the indentation guard.
 pub trait IndentGuard: Send + Sync {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// We use a compound type here because we need to know if this is a standard stdout writer or a custom writer. This
+/// helps us decide which formatters are reasonable to use. (For example we would never use the spinner formatter when
+/// not writing to stdout)
+#[derive(Clone)]
+pub struct OutputTarget {
+    kind: OutputTargetKind,
+    target: Arc<Mutex<dyn Write + Send>>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub enum OutputTargetKind {
+    Stdout,
+    Custom,
+}
+
+#[derive(Clone)]
 pub struct Options {
-    /// Turn on printing for debug lines.
+    /// Turn on printing for debug lines. Defaults to false.
     pub debug: bool,
 
-    /// Maximum character length for lines including indentation.
+    /// Maximum character length for lines including indentation. Defaults to terminal width.
     pub max_line_length: usize,
 
-    /// Amount of spacing between end of window and start of text.
+    /// Amount of spacing between end of window and start of text. Defaults to 0.
     pub padding: u16,
+
+    /// Where all output is written. (e.g. `File`, `BufWriter`, `Cursor<Vec<u8>>`, etc). Defaults to stdout.
+    pub output_target: OutputTarget,
+}
+
+impl Options {
+    /// Sets the debug mode. Debug controls if debug lines are printed are not.
+    pub fn with_debug(self, debug: bool) -> Self {
+        Self { debug, ..self }
+    }
+
+    /// Sets the max line length which controls the character length for lines (also counting indentation).
+    pub fn with_max_line_length(self, max_line_length: usize) -> Self {
+        Self {
+            max_line_length,
+            ..self
+        }
+    }
+
+    /// Sets the padding for the text. This controls the number of spaces between the end of your terminal window
+    /// and where the text will start printing.
+    pub fn with_padding(self, padding: u16) -> Self {
+        Self { padding, ..self }
+    }
+
+    /// Sets the output target. This can be used to control where the output gets written to so your program
+    /// can flexibly write to stdout or a file or simply a buffer.
+    ///
+    /// By default polyfmt outputs to stdout. Calling this function will also disable the `[Spinner]` functionality
+    /// since it doesn't makes sense outside a tty context.
+    pub fn with_custom_output_target<W: Write + Send + 'static>(self, target: W) -> Self {
+        Self {
+            output_target: OutputTarget {
+                kind: OutputTargetKind::Custom,
+                target: Arc::new(Mutex::new(std::io::LineWriter::new(target))),
+            },
+            ..self
+        }
+    }
 }
 
 impl Default for Options {
@@ -193,6 +288,12 @@ impl Default for Options {
             debug: Default::default(),
             max_line_length,
             padding: 0,
+            output_target: OutputTarget {
+                kind: OutputTargetKind::Stdout,
+                // We default to writing to stdout, but we wrap it in a LineWriter so we consistently flush the buffer
+                // on newlines. This makes it so write buffering is more predictable.
+                target: Arc::new(Mutex::new(std::io::LineWriter::new(std::io::stdout()))),
+            },
         }
     }
 }
@@ -212,7 +313,7 @@ impl<T: erased_serde::Serialize + Display> Displayable for T {
 }
 
 /// The core library trait.
-pub trait Formatter: Debug + Send + Sync {
+pub trait Formatter: Send + Sync {
     /// Will attempt to intelligently print objects passed to it.
     ///
     /// Note: For the spinner format this will add a new persistent message to
@@ -312,20 +413,26 @@ pub fn get_global_formatter() -> &'static Mutex<Box<dyn Formatter>> {
 pub fn new(format: Format, options: Options) -> Box<dyn Formatter> {
     match format {
         Format::Plain => {
-            let formatter = plain::Plain::new(options.debug, options.max_line_length);
+            let formatter = plain::Plain::new(options);
             Box::new(formatter)
         }
         Format::Spinner => {
-            let formatter =
-                spinner::Spinner::new(options.debug, options.max_line_length, options.padding);
+            // If the output target is a custom type just use the plain formatter. Spinners play well outside
+            // the terminal context.
+            if options.output_target.kind == OutputTargetKind::Custom {
+                let formatter = plain::Plain::new(options);
+                return Box::new(formatter);
+            }
+
+            let formatter = spinner::Spinner::new(options);
             Box::new(formatter)
         }
         Format::Tree => {
-            let formatter = tree::Tree::new(options.debug, options.max_line_length);
+            let formatter = tree::Tree::new(options);
             Box::new(formatter)
         }
         Format::Json => {
-            let formatter = json::Json::new(options.debug);
+            let formatter = json::Json::new(options);
             Box::new(formatter)
         }
         Format::Silent => {
@@ -333,15 +440,6 @@ pub fn new(format: Format, options: Options) -> Box<dyn Formatter> {
             Box::new(formatter)
         }
     }
-}
-
-/// Convenience function to determine if format should run based on allowed formats.
-fn is_allowed(current_format: Format, allowed_formats: &HashSet<Format>) -> bool {
-    if !allowed_formats.contains(&current_format) && !allowed_formats.is_empty() {
-        return false;
-    }
-
-    true
 }
 
 fn split_on_whitespace_keep_delimiter_grouped(s: &str) -> Vec<String> {
@@ -733,172 +831,50 @@ pub fn choose_many(choices: &mut [(&str, bool)], page_size: usize) -> Result<()>
     bail!("display chooser was interrupted before ending properly")
 }
 
+/// Drains `allowed_formats` and returns true if the current format is allowed.
+/// Leaves `allowed_formats` empty regardless.
+pub fn take_and_check_allowed(current: Format, allowed_formats: &mut HashSet<Format>) -> bool {
+    let allowed = std::mem::take(allowed_formats);
+
+    if allowed.contains(&current) || allowed.is_empty() {
+        return true;
+    }
+
+    false
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{error, format_text_by_length, indent, println, question};
+    use crate::{format_text_by_length, take_and_check_allowed, Format};
     use rstest::rstest;
-    use std::{str::FromStr, thread, time};
+    use std::{
+        collections::HashSet,
+        io::{self, Write},
+        sync::{Arc, Mutex},
+    };
 
-    #[test]
-    #[ignore]
-    fn tree() {
-        let options = crate::Options {
-            debug: true,
-            max_line_length: 40,
-            padding: 0,
-        };
-
-        let some_flag = "tree".to_string();
-        let format = crate::Format::from_str(&some_flag).unwrap();
-
-        let mut fmt = crate::new(format, options);
-
-        fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
-
-        let _guard = fmt.indent();
-        fmt.spacer();
-
-        fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
+    #[derive(Clone, Default)]
+    struct SharedBuffer {
+        inner: Arc<Mutex<Vec<u8>>>,
     }
 
-    #[test]
-    #[ignore]
-    fn spinner() {
-        let options = crate::Options {
-            debug: true,
-            max_line_length: 40,
-            padding: 1,
-        };
-        let ten_millis = time::Duration::from_secs(2);
-
-        let some_flag = "spinner".to_string();
-        let format = crate::Format::from_str(&some_flag).unwrap();
-
-        let mut fmt = crate::new(format, options);
-
-        fmt.print(&"Processing line");
-        fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        thread::sleep(ten_millis);
-
-        fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        thread::sleep(ten_millis);
-
-        fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        thread::sleep(ten_millis);
-
-        fmt.print(&"Look I can stop spinning");
-        fmt.println(&"And I can still print things");
-        fmt.pause();
-        thread::sleep(ten_millis);
-
-        fmt.print(&"Okay lets keep going");
-        fmt.resume();
-        fmt.println(&"Testing again");
-        thread::sleep(ten_millis);
-
-        fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        thread::sleep(ten_millis);
-
-        fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
-    }
-
-    #[test]
-    #[ignore]
-    fn json() {
-        let options = crate::Options {
-            debug: true,
-            max_line_length: 80,
-            padding: 0,
-        };
-
-        let some_flag = "json".to_string();
-        let format = crate::Format::from_str(&some_flag).unwrap();
-
-        let mut fmt = crate::new(format, options);
-
-        fmt.print(&"Demoing! ");
-        fmt.println(&"Hello from polyfmt");
-        fmt.success(&"This is a successful message!");
-        fmt.warning(&"This is a warning message");
-        fmt.debug(&"This is a debug message");
-        fmt.error(&"This is an error message");
-    }
-
-    #[test]
-    #[ignore]
-    fn plain() {
-        let options = crate::Options {
-            debug: true,
-            max_line_length: 40,
-            padding: 0,
-        };
-
-        let some_flag = "plain".to_string();
-        let format = crate::Format::from_str(&some_flag).unwrap();
-
-        let mut fmt = crate::new(format, options);
-
-        fmt.println(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.error(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.success(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.warning(&"Hello from polyfmt, Look at how well it breaks up lines!");
-        fmt.debug(&"Hello from polyfmt, Look at how well it breaks up lines!");
-    }
-
-    // These tests aren't real tests, I just eyeball things to see if they work.
-    // Maybe I'll write real tests, maybe I wont. Shut-up.
-    #[test]
-    #[ignore]
-    fn global_easy() {
-        use crate::{indent, print, println, spacer};
-        let options = crate::Options {
-            debug: true,
-            max_line_length: 40,
-            padding: 1,
-        };
-
-        let some_flag = "tree".to_string();
-        let format = crate::Format::from_str(&some_flag).unwrap();
-
-        let fmt = crate::new(format, options);
-        crate::set_global_formatter(fmt);
-
-        _ = question!("To setup a brand: ");
-        _ = question!("To setup a brand: ");
-        println!("Hello, we have a thing that we do");
-        _ = question!("To setup a brand: ");
-
-        println!("{} service setup", "Astra");
-        spacer!();
-        print!("\n");
-        println!("{}", "To setup a brand new service we'll need to initialize the infrastructure that allows you \
-        to manage and deploy the service. We'll set up the following for your service:\n".to_owned() +
-           &format!("  • An {} repository for container management.\n", "ECR (Elastic Container Registry)") +
-           &format!("  • {} along with appropriate target groups for efficient traffic distribution.\n", "Load balancers") +
-           &format!("  • An {} service definition to manage your containerized applications.\n", "ECS (Elastic Container Service)") +
-           &format!("  • A {} to initialize your containers and define core functionality like logging.\n", "starter ECS task definition") +
-           &format!("  • Necessary {} for secure, reliable connectivity.\n", "DNS entries and TLS certificates")
-        );
-        spacer!();
-        println!(
-            "Astra will attempt to use Terraform to create this infrastructure on your behalf."
-        );
-
-        struct Customer {
-            id: String,
-            name: String,
+    impl Write for SharedBuffer {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            let mut inner = self.inner.lock().unwrap();
+            inner.extend_from_slice(buf);
+            Ok(buf.len())
         }
 
-        let customer = Customer {
-            id: "id".to_string(),
-            name: "name".to_string(),
-        };
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
 
-        let _guard = indent!();
-        error!("Created customer [{}] {}", customer.id, customer.name);
+    impl SharedBuffer {
+        fn into_string(self) -> String {
+            let inner = self.inner.lock().unwrap();
+            String::from_utf8_lossy(&inner).to_string()
+        }
     }
 
     #[rstest]
@@ -927,5 +903,72 @@ mod tests {
     #[case::preserve_double_newlines("Top line before the gap\n\nLine after the gap", vec!["Top line before the gap", "", "Line after the gap"])]
     fn test_format_text_length(#[case] input: &str, #[case] expected: Vec<&str>) {
         assert_eq!(format_text_by_length(&input, 0, 40), expected)
+    }
+
+    #[rstest]
+    #[case::allowed(vec![Format::Plain, Format::Json], Format::Plain, true)]
+    #[case::not_allowed(vec![Format::Spinner], Format::Json, false)]
+    #[case::empty(Vec::<Format>::new(), Format::Tree, true)]
+    fn take_and_check_allowed_drains_and_checks(
+        #[case] initial: Vec<Format>,
+        #[case] current: Format,
+        #[case] expected: bool,
+    ) {
+        let mut allowed: HashSet<Format> = initial.into_iter().collect();
+        assert_eq!(take_and_check_allowed(current, &mut allowed), expected);
+        assert!(allowed.is_empty());
+    }
+
+    #[test]
+    fn plain_outputs_and_respects_debug_and_indent() {
+        std::env::set_var("NO_COLOR", "1");
+        let sink = SharedBuffer::default();
+        let opts = crate::Options::default().with_custom_output_target(sink.clone());
+        let mut fmt = crate::new(Format::Plain, opts);
+
+        fmt.println(&"base");
+        {
+            let _g = fmt.indent();
+            fmt.println(&"indented");
+        }
+        fmt.debug(&"hidden debug");
+        fmt.finish();
+
+        let output = sink.into_string();
+        assert!(output.contains("base\n"));
+        assert!(output.contains(" indented\n"));
+        assert!(!output.contains("hidden debug"));
+    }
+
+    #[test]
+    fn json_outputs_labels_and_respects_debug() {
+        let sink = SharedBuffer::default();
+        let opts = crate::Options::default().with_custom_output_target(sink.clone());
+        let mut fmt = crate::new(Format::Json, opts);
+
+        fmt.println(&"hello");
+        fmt.success(&"ok");
+        fmt.debug(&"hidden");
+        fmt.finish();
+
+        let output = sink.into_string();
+
+        let mut lines = output.lines();
+
+        let first = lines.next().expect("info line");
+        let second = lines.next().expect("success line");
+        assert!(
+            lines.next().is_none(),
+            "unexpected extra lines in json output"
+        );
+
+        let info: serde_json::Value = serde_json::from_str(first).unwrap();
+        let success: serde_json::Value = serde_json::from_str(second).unwrap();
+
+        assert_eq!(info.get("label").unwrap(), "info");
+        assert_eq!(info.get("data").unwrap(), "hello");
+        assert_eq!(success.get("label").unwrap(), "success");
+        assert_eq!(success.get("data").unwrap(), "ok");
+        assert!(!output.contains("hidden"));
     }
 }

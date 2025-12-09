@@ -1,23 +1,28 @@
-use crate::{format_text_by_length, is_allowed, Displayable, Format, Formatter, IndentGuard};
+use crate::{
+    format_text_by_length, take_and_check_allowed, Displayable, Format, Formatter, IndentGuard,
+    Options,
+};
 use colored::Colorize;
-use scopeguard::defer;
 use std::sync::{Arc, Mutex, Weak};
 use std::{collections::HashSet, io::Write};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Plain {
     debug: bool,
     indentation_level: u16,
     max_line_length: usize,
     allowed_formats: HashSet<Format>,
+    output_target: Arc<Mutex<dyn Write + Send>>,
 }
 
 impl Plain {
-    pub fn new(debug: bool, max_line_length: usize) -> Arc<Mutex<Self>> {
+    pub fn new(options: Options) -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(Plain {
-            debug,
-            max_line_length,
-            ..Default::default()
+            debug: options.debug,
+            indentation_level: 0,
+            allowed_formats: HashSet::new(),
+            max_line_length: options.max_line_length,
+            output_target: options.output_target.target,
         }))
     }
 }
@@ -47,21 +52,16 @@ impl Drop for Guard {
 
 impl Plain {
     fn print(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Plain, &mut self.allowed_formats) {
             return;
         }
 
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
-
-        print!("{msg}");
+        let mut output_target = self.output_target.lock().unwrap();
+        let _ = write!(output_target, "{msg}");
     }
 
     fn println(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Plain, &mut self.allowed_formats) {
             return;
         }
 
@@ -71,7 +71,10 @@ impl Plain {
             return;
         }
 
-        println!(
+        let mut output_target = self.output_target.lock().unwrap();
+
+        let _ = writeln!(
+            output_target,
             "{}{}",
             " ".repeat(self.indentation_level.into()),
             lines.first().unwrap_or(&"".to_string()),
@@ -79,17 +82,17 @@ impl Plain {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!("{}{}", " ".repeat(self.indentation_level.into()), line);
-        }
-
-        defer! {
-            self.allowed_formats = HashSet::new();
+            let _ = writeln!(
+                output_target,
+                "{}{}",
+                " ".repeat(self.indentation_level.into()),
+                line
+            );
         }
     }
 
     fn error(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Plain, &mut self.allowed_formats) {
             return;
         }
 
@@ -99,7 +102,10 @@ impl Plain {
             return;
         }
 
-        println!(
+        let mut output_target = self.output_target.lock().unwrap();
+
+        let _ = writeln!(
+            output_target,
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "x".red(),
@@ -108,21 +114,17 @@ impl Plain {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{}",
                 " ".repeat((self.indentation_level + 2).into()),
                 line
             );
         }
-
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
     }
 
     fn success(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Plain, &mut self.allowed_formats) {
             return;
         }
 
@@ -132,7 +134,10 @@ impl Plain {
             return;
         }
 
-        println!(
+        let mut output_target = self.output_target.lock().unwrap();
+
+        let _ = writeln!(
+            output_target,
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "✓".green(),
@@ -141,21 +146,17 @@ impl Plain {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{}",
                 " ".repeat((self.indentation_level + 2).into()),
                 line
             );
         }
-
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
     }
 
     fn warning(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Plain, &mut self.allowed_formats) {
             return;
         }
 
@@ -165,7 +166,10 @@ impl Plain {
             return;
         }
 
-        println!(
+        let mut output_target = self.output_target.lock().unwrap();
+
+        let _ = writeln!(
+            output_target,
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "!!".yellow(),
@@ -174,21 +178,17 @@ impl Plain {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            let _ = writeln!(
+                output_target,
                 " {}{}",
                 " ".repeat((self.indentation_level + 2).into()),
                 line
             );
         }
-
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
     }
 
     fn debug(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Plain, &self.allowed_formats) || !self.debug {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Plain, &mut self.allowed_formats) || !self.debug {
             return;
         }
 
@@ -198,7 +198,10 @@ impl Plain {
             return;
         }
 
-        println!(
+        let mut output_target = self.output_target.lock().unwrap();
+
+        let _ = writeln!(
+            output_target,
             "{}{} {}",
             " ".repeat(self.indentation_level.into()),
             "[debug]".dimmed(),
@@ -207,15 +210,12 @@ impl Plain {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{} {}",
                 " ".repeat((self.indentation_level + 7).into()),
                 line
             );
-        }
-
-        defer! {
-            self.allowed_formats = HashSet::new();
         }
     }
 
@@ -235,7 +235,9 @@ impl Plain {
     }
 
     fn spacer(&mut self) {
-        println!();
+        let mut output_target = self.output_target.lock().unwrap();
+
+        let _ = writeln!(output_target);
     }
 
     #[allow(dead_code)]
@@ -245,41 +247,46 @@ impl Plain {
     fn start(&mut self) {}
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
-        if !is_allowed(Format::Plain, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Plain, &mut self.allowed_formats) {
             return "".to_string();
         }
 
         let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
+        let mut output_target = self.output_target.lock().unwrap();
+
         if lines.len() == 1 {
-            print!(
+            let _ = write!(
+                output_target,
                 "{}{} {}",
                 " ".repeat(self.indentation_level.into()),
                 "?".magenta(),
                 lines.first().unwrap_or(&"".to_string()),
             );
         } else {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{} {}",
                 " ".repeat(self.indentation_level.into()),
                 "?".magenta(),
                 lines.first().unwrap_or(&"".to_string()),
             );
 
-            // Print the remaining lines except the last with println!
+            // Print the remaining lines except the last with writeln!
             let lines_count = lines.len();
             for (index, line) in lines.iter().enumerate().skip(1) {
                 if index + 1 < lines_count {
                     // Not the last line
-                    println!(
+                    let _ = writeln!(
+                        output_target,
                         "{}{}",
                         " ".repeat((self.indentation_level + 2).into()),
                         line
                     );
                 } else {
                     // Last line, use print! instead
-                    print!(
+                    let _ = write!(
+                        output_target,
                         "{}{}",
                         " ".repeat((self.indentation_level + 2).into()),
                         line
@@ -288,11 +295,8 @@ impl Plain {
             }
         }
 
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
-
-        std::io::stdout().flush().unwrap();
+        output_target.flush().unwrap();
+        drop(output_target);
 
         let mut input = String::from("");
 
@@ -307,7 +311,9 @@ impl Plain {
     }
 
     fn finish(&self) {
-        std::io::stdout().flush().unwrap();
+        if let Ok(mut out) = self.output_target.lock() {
+            let _ = out.flush();
+        }
     }
 }
 

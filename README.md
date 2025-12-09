@@ -60,6 +60,28 @@ let mut fmt = polyfmt::new(Format::Plain, Options::default());
 fmt.print(&"test");
 ```
 
+### Tuning `Options`
+
+`Options::default()` gets you sensible defaults (no debug output, auto max line length based on terminal width, zero
+padding, line-buffered stdout). You can tune individual fields with builder-style helpers:
+
+```rust
+use polyfmt::{Format, Options};
+
+let opts = Options::default()
+    .with_debug(true)
+    .with_max_line_length(60)
+    .padding(2)
+    .with_custom_output_target(std::fs::File::create("out.log")?);
+```
+
+Builder notes:
+- `with_debug(bool)`: turn debug lines on/off (default: off).
+- `with_max_line_length(usize)`: override line wrapping length (default: terminal width minus a small margin).
+- `with_padding(u16)`: add leading spaces before output (default: 0).
+- `with_custom_output_target`: send output to any writer (files, buffers, etc.). Spinner
+  falls back to plain when using a custom target because spinners only make sense on a TTY.
+
 ### Filtering output
 
 Sometimes you'll want to output something only for specific formatters.
@@ -96,6 +118,25 @@ let format = Format::from_str(&some_flag).unwrap();
 let mut fmt = new(format, Options::default());
 ```
 
+### Redirecting output (stdout, files, buffers)
+
+Polyfmt now lets you pick where output goes. By default everything is written to stdout with line-buffering. You can
+point output at any `Write + Send + Sync` target (e.g., file, buffer, socket) via `Options::with_custom_output_target`:
+
+```rust
+use polyfmt::{new, Format, Options};
+use std::fs::File;
+
+let file = File::create("polyfmt.log")?;
+let opts = Options::default().with_custom_output_target(file);
+let mut fmt = new(Format::Plain, opts);
+fmt.println(&"Hello to a file");
+fmt.finish();
+```
+
+Spinner output only makes sense on a TTY; if you choose `Format::Spinner` with a custom output target, polyfmt will
+fall back to the plain formatter.
+
 ### Indentation
 
 Polyfmt supports indentation also with a similar implementation to spans in the tracing crate
@@ -116,5 +157,7 @@ println!("This line has the same indentation level as the first.");
 ### Additional Details
 
 - You can turn off color by using the popular `NO_COLOR` environment variable.
+- Output defaults to line-buffered stdout; use `Options::with_custom_output_target(...)` to redirect to files or other
+  sinks.
 - Anything to be printed must implement Display and Serialize due to the need to possibly print it into both plaintext
   and json.

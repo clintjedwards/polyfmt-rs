@@ -1,26 +1,33 @@
-use crate::{format_text_by_length, is_allowed, Displayable, Format, Formatter, IndentGuard};
+use crate::{
+    format_text_by_length, take_and_check_allowed, Displayable, Format, Formatter, IndentGuard,
+    Options,
+};
 use colored::Colorize;
-use scopeguard::defer;
 use std::collections::HashSet;
 use std::io::Write;
 use std::sync::{Arc, Mutex, Weak};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Tree {
     debug: bool,
     indentation_level: u16,
     max_line_length: usize,
     allowed_formats: HashSet<Format>,
+    output_target: Arc<Mutex<dyn Write + Send>>,
 
     header_printed: bool,
 }
 
 impl Tree {
-    pub fn new(debug: bool, max_line_length: usize) -> Arc<Mutex<Self>> {
+    pub fn new(options: Options) -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(Tree {
-            debug,
-            max_line_length,
-            ..Default::default()
+            debug: options.debug,
+            indentation_level: 0,
+            max_line_length: options.max_line_length,
+            allowed_formats: HashSet::new(),
+            output_target: options.output_target.target,
+
+            header_printed: false,
         }))
     }
 }
@@ -50,48 +57,48 @@ impl Drop for Guard {
 
 impl Tree {
     fn print(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Tree, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Tree, &mut self.allowed_formats) {
             return;
         }
 
-        print!("{}{msg}", "│ ".magenta());
+        let mut output_target = self.output_target.lock().unwrap();
 
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
+        let _ = write!(output_target, "{}{msg}", "│ ".magenta());
     }
 
     fn println(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Tree, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Tree, &mut self.allowed_formats) {
             return;
         }
+
+        let mut output_target = self.output_target.lock().unwrap();
 
         let lines = format_text_by_length(msg, self.indentation_level, self.max_line_length);
 
         // If we're completely empty but the user wants a new line they probably want to leave
         // a space but not use the spacer function. We should just print a space.
         if lines.is_empty() {
-            println!("{}", "│ ".magenta());
+            let _ = writeln!(output_target, "{}", "│ ".magenta());
             return;
         }
 
         // Similarly if the user has only entered a new line they probably want to do the same thing.
         if lines.len() == 1 && lines[0].is_empty() {
-            println!("{}", "│ ".magenta());
+            let _ = writeln!(output_target, "{}", "│ ".magenta());
             return;
         }
 
         if self.header_printed {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{} {}",
                 "├─".magenta(),
                 format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
                 lines.first().unwrap_or(&"".to_string()),
             );
         } else {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{} {}",
                 "┌─".magenta(),
                 format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
@@ -102,24 +109,22 @@ impl Tree {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{} {}",
                 "│ ".magenta(),
                 " ".repeat(self.indentation_level.into()),
                 line
             );
         }
-
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
     }
 
     fn error(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Tree, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Tree, &mut self.allowed_formats) {
             return;
         }
+
+        let mut output_target = self.output_target.lock().unwrap();
 
         let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
@@ -127,7 +132,8 @@ impl Tree {
             return;
         }
 
-        println!(
+        let _ = writeln!(
+            output_target,
             "{}{} {} {}",
             "├─".magenta(),
             format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
@@ -137,24 +143,22 @@ impl Tree {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{} {}",
                 "│ ".magenta(),
                 " ".repeat(self.indentation_level.into()),
                 line
             );
         }
-
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
     }
 
     fn success(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Tree, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Tree, &mut self.allowed_formats) {
             return;
         }
+
+        let mut output_target = self.output_target.lock().unwrap();
 
         let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
@@ -162,7 +166,8 @@ impl Tree {
             return;
         }
 
-        println!(
+        let _ = writeln!(
+            output_target,
             "{}{} {} {}",
             "├─".magenta(),
             format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
@@ -172,24 +177,22 @@ impl Tree {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{} {}",
                 "│ ".magenta(),
                 " ".repeat(self.indentation_level.into()),
                 line
             );
         }
-
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
     }
 
     fn warning(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Tree, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Tree, &mut self.allowed_formats) {
             return;
         }
+
+        let mut output_target = self.output_target.lock().unwrap();
 
         let lines = format_text_by_length(msg, self.indentation_level + 3, self.max_line_length);
 
@@ -197,7 +200,8 @@ impl Tree {
             return;
         }
 
-        println!(
+        let _ = writeln!(
+            output_target,
             "{}{} {} {}",
             "├─".magenta(),
             format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
@@ -207,24 +211,22 @@ impl Tree {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{} {}",
                 "│ ".magenta(),
                 " ".repeat(self.indentation_level.into()),
                 line
             );
         }
-
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
     }
 
     fn debug(&mut self, msg: &dyn Displayable) {
-        if !is_allowed(Format::Tree, &self.allowed_formats) || !self.debug {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Tree, &mut self.allowed_formats) || !self.debug {
             return;
         }
+
+        let mut output_target = self.output_target.lock().unwrap();
 
         let lines = format_text_by_length(msg, self.indentation_level + 8, self.max_line_length);
 
@@ -232,7 +234,8 @@ impl Tree {
             return;
         }
 
-        println!(
+        let _ = writeln!(
+            output_target,
             "{}{} {} {}",
             "├─".magenta(),
             format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
@@ -242,16 +245,13 @@ impl Tree {
 
         // Print the remaining lines
         for line in lines.iter().skip(1) {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{} {}",
                 "│ ".magenta(),
                 " ".repeat(self.indentation_level.into()),
                 line
             );
-        }
-
-        defer! {
-            self.allowed_formats = HashSet::new();
         }
     }
 
@@ -271,7 +271,9 @@ impl Tree {
     }
 
     fn spacer(&mut self) {
-        println!("{}", "┊".magenta(),);
+        let mut output_target = self.output_target.lock().unwrap();
+
+        let _ = writeln!(output_target, "{}", "┊".magenta(),);
     }
 
     #[allow(dead_code)]
@@ -281,15 +283,17 @@ impl Tree {
     fn start(&mut self) {}
 
     fn question(&mut self, msg: &dyn Displayable) -> String {
-        if !is_allowed(Format::Tree, &self.allowed_formats) {
-            self.allowed_formats = HashSet::new();
+        if !take_and_check_allowed(Format::Tree, &mut self.allowed_formats) {
             return "".to_string();
         }
+
+        let mut output_target = self.output_target.lock().unwrap();
 
         let lines = format_text_by_length(msg, self.indentation_level + 2, self.max_line_length);
 
         if lines.len() == 1 {
-            print!(
+            let _ = write!(
+                output_target,
                 "{}{} {} {}",
                 "├─".magenta(),
                 format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
@@ -297,7 +301,8 @@ impl Tree {
                 lines.first().unwrap_or(&"".to_string()),
             );
         } else {
-            println!(
+            let _ = writeln!(
+                output_target,
                 "{}{} {} {}",
                 "├─".magenta(),
                 format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
@@ -305,12 +310,13 @@ impl Tree {
                 lines.first().unwrap_or(&"".to_string()),
             );
 
-            // Print the remaining lines except the last with println!
+            // Print the remaining lines except the last with writeln!
             let lines_count = lines.len();
             for (index, line) in lines.iter().enumerate().skip(1) {
                 if index + 1 < lines_count {
                     // Not the last line
-                    println!(
+                    let _ = writeln!(
+                        output_target,
                         "{}{} {}",
                         "│ ".magenta(),
                         format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
@@ -318,7 +324,8 @@ impl Tree {
                     );
                 } else {
                     // Last line, use print! instead
-                    print!(
+                    let _ = write!(
+                        output_target,
                         "{}{} {}",
                         "│ ".magenta(),
                         format!("{}", "─".magenta()).repeat(self.indentation_level.into()),
@@ -328,15 +335,12 @@ impl Tree {
             }
         }
 
-        std::io::stdout().flush().unwrap();
+        output_target.flush().unwrap();
+        drop(output_target);
 
         let mut input = String::from("");
 
         let _ = std::io::stdin().read_line(&mut input);
-
-        defer! {
-            self.allowed_formats = HashSet::new();
-        }
 
         input.trim().to_string()
     }
@@ -347,7 +351,9 @@ impl Tree {
     }
 
     fn finish(&self) {
-        std::io::stdout().flush().unwrap();
+        if let Ok(mut out) = self.output_target.lock() {
+            let _ = out.flush();
+        }
     }
 }
 
