@@ -60,6 +60,17 @@ let mut fmt = polyfmt::new(Format::Plain, Options::default());
 fmt.print(&"test");
 ```
 
+### Feature flags
+
+- `tui` *(off by default)*: opt into interactive helpers such as `polyfmt::tui::choose_one` and
+  `polyfmt::tui::choose_many`. These operate directly on stdout/tty and aren’t suitable for custom
+  output targets. Enable them with:
+
+```toml
+[dependencies]
+polyfmt = { version = "0.0.13", features = ["tui"] }
+```
+
 ### Tuning `Options`
 
 `Options::default()` gets you sensible defaults (no debug output, auto max line length based on terminal width, zero
