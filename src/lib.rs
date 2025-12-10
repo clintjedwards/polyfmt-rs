@@ -211,8 +211,8 @@ pub trait IndentGuard: Send + Sync {}
 /// not writing to stdout)
 #[derive(Clone)]
 pub struct OutputTarget {
-    kind: OutputTargetKind,
-    target: Arc<Mutex<dyn Write + Send>>,
+    pub kind: OutputTargetKind,
+    pub target: Arc<Mutex<dyn Write + Send>>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -554,7 +554,8 @@ fn format_text_by_length(
 }
 
 /// Enables the spinner to automatically clean itself up, when dropped.
-pub struct Spinner {
+#[allow(dead_code)]
+pub(crate) struct Spinner {
     internal: ProgressBar,
 }
 
@@ -564,8 +565,9 @@ impl Drop for Spinner {
     }
 }
 
+#[allow(dead_code)]
 impl Spinner {
-    pub fn create(initial_message: &str) -> Spinner {
+    pub(crate) fn create(initial_message: &str) -> Spinner {
         let spinner = ProgressBar::new_spinner();
         spinner.enable_steady_tick(Duration::from_millis(120));
         spinner.set_style(
@@ -577,18 +579,18 @@ impl Spinner {
         Spinner { internal: spinner }
     }
 
-    pub fn set_message(&self, msg: String) {
+    pub(crate) fn set_message(&self, msg: String) {
         self.internal.set_message(msg);
     }
 
-    pub fn suspend<F: FnOnce() -> T, T>(&self, f: F) -> T {
+    pub(crate) fn suspend<F: FnOnce() -> T, T>(&self, f: F) -> T {
         self.internal.suspend(f)
     }
 }
 
 /// Drains `allowed_formats` and returns true if the current format is allowed.
 /// Leaves `allowed_formats` empty regardless.
-pub fn take_and_check_allowed(current: Format, allowed_formats: &mut HashSet<Format>) -> bool {
+fn take_and_check_allowed(current: Format, allowed_formats: &mut HashSet<Format>) -> bool {
     let allowed = std::mem::take(allowed_formats);
 
     if allowed.contains(&current) || allowed.is_empty() {
