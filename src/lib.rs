@@ -491,6 +491,10 @@ fn format_text_by_length(
     let msg = msg.to_string();
     let indentation_level = usize::from(indentation_level);
 
+    if msg.is_empty() {
+        return vec![String::new()];
+    }
+
     if max_line_length <= indentation_level {
         return vec![];
     }
@@ -894,6 +898,7 @@ mod tests {
     #[case::preserve_new_lines("The greatest\n glory in living\n lies not in never falling", vec!["The greatest", "glory in living", "lies not in never falling"])]
     #[case::preserve_multiple_spaces_on_newline("Hello\n  • Some bullet point here", vec!["Hello", "  • Some bullet point here"])]
     #[case::preserve_double_newlines("Top line before the gap\n\nLine after the gap", vec!["Top line before the gap", "", "Line after the gap"])]
+    #[case::handle_empty_string("", vec![""])]
     fn test_format_text_length(#[case] input: &str, #[case] expected: Vec<&str>) {
         assert_eq!(format_text_by_length(&input, 0, 40), expected)
     }
