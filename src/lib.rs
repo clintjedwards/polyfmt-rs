@@ -168,9 +168,7 @@ mod tree;
 use anyhow::{bail, Result};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
-use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -181,10 +179,6 @@ use std::{
 };
 use strum::EnumString;
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
-
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"(\s+)").expect("Invalid regex");
-}
 
 #[derive(Debug, Default, EnumString, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[strum(ascii_case_insensitive)]
@@ -511,7 +505,6 @@ fn format_text_by_length(
         // and then add the entire line to the lines vec. Sometimes the newlines are back to back though,
         // which show up as "\n\n". In this case we should add that amount of newlines.
         if word.starts_with('\n') {
-            dbg!(word.len());
             for _ in word.chars() {
                 lines.push(current_line.clone());
                 current_line = String::new();
