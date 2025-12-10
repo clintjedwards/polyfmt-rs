@@ -602,7 +602,7 @@ fn take_and_check_allowed(current: Format, allowed_formats: &mut HashSet<Format>
 
 #[cfg(test)]
 mod tests {
-    use crate::{format_text_by_length, take_and_check_allowed, Format};
+    use crate::{Format, format_text_by_length, take_and_check_allowed};
     use rstest::rstest;
     use std::{
         collections::HashSet,
@@ -679,7 +679,9 @@ mod tests {
 
     #[test]
     fn plain_outputs_and_respects_debug_and_indent() {
-        std::env::set_var("NO_COLOR", "1");
+        unsafe {
+            std::env::set_var("NO_COLOR", "1");
+        }
         let sink = SharedBuffer::default();
         let opts = crate::Options::default().with_custom_output_target(sink.clone());
         let mut fmt = crate::new(Format::Plain, opts);
