@@ -71,7 +71,7 @@ use polyfmt::{Format, Options};
 let opts = Options::default()
     .with_debug(true)
     .with_max_line_length(60)
-    .padding(2)
+    .with_padding(2)
     .with_custom_output_target(std::fs::File::create("out.log")?);
 ```
 
