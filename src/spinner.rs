@@ -5,7 +5,7 @@ use crate::{
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::sync::{Arc, Mutex, Weak};
-use std::{collections::HashSet, io::Write, time::Duration};
+use std::{collections::HashSet, io::IsTerminal, io::Write, time::Duration};
 
 #[derive(Clone)]
 pub struct Spinner {
@@ -194,9 +194,16 @@ impl Spinner {
 
     fn pause(&mut self) {
         self.spinner.disable_steady_tick();
+        self.spinner.set_draw_target(indicatif::ProgressDrawTarget::hidden());
+        // Erase the spinner line left on screen after hiding the draw target.
+        if std::io::stderr().is_terminal() {
+            eprint!("\r\x1b[2K");
+        }
     }
 
     fn resume(&mut self) {
+        self.spinner
+            .set_draw_target(indicatif::ProgressDrawTarget::stdout());
         self.spinner.enable_steady_tick(Duration::from_millis(120));
     }
 

@@ -56,6 +56,25 @@ fn main() {
     thread::sleep(Duration::from_millis(1400));
     spinner.success(&"Done");
     spinner.finish();
+    sleep();
+
+    println!("--- Spinner pause/resume ---");
+    let mut spinner2 = new(
+        Format::Spinner,
+        Options::default().with_padding(1),
+    );
+    spinner2.print(&"Spinning...");
+    thread::sleep(Duration::from_millis(1000));
+    spinner2.pause();
+    // Direct stdout write — should not collide with spinner
+    println!("Direct stdout line 1 (spinner should be gone)");
+    println!("Direct stdout line 2");
+    thread::sleep(Duration::from_millis(500));
+    spinner2.resume();
+    spinner2.print(&"Back to spinning");
+    thread::sleep(Duration::from_millis(1000));
+    spinner2.success(&"Done");
+    spinner2.finish();
 
     #[cfg(feature = "tui")]
     {
